@@ -22,4 +22,4 @@ config/** linguist-vendored
 tests/** linguist-documentation
 
 # Python 파일 중 일부를 문서로 분류
-*.py linguist-language=Python
+*.py linguist-vendored
