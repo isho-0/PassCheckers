@@ -277,7 +277,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 
 const { isAuthenticated, user } = useAuth()
 const parallaxOffset = ref(0)
@@ -305,19 +305,38 @@ const handleScroll = () => {
   parallaxOffset.value = scrollTop
 }
 
-onMounted(() => {
-  window.addEventListener('scroll', handleScroll)
-  
-  // 쿼리 파라미터 확인하여 토스트 표시
+// 쿼리 파라미터 확인하여 토스트 표시하는 함수
+const checkAuthRequired = () => {
   console.log('Route query:', route.query)
   if (route.query.auth_required === 'true') {
     console.log('Showing auth toast')
-    showAuthToast.value = true
+    // 토스트가 이미 표시된 상태라면 먼저 숨기고 다시 표시
+    if (showAuthToast.value) {
+      showAuthToast.value = false
+      setTimeout(() => {
+        showAuthToast.value = true
+      }, 100)
+    } else {
+      showAuthToast.value = true
+    }
     // 토스트가 표시된 후 URL에서 쿼리 파라미터 제거 (약간의 지연)
     setTimeout(() => {
       router.replace('/')
     }, 100)
   }
+}
+
+// 라우트 변화 감지
+watch(() => route.query, (newQuery) => {
+  console.log('Route query changed:', newQuery)
+  checkAuthRequired()
+}, { immediate: true })
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll)
+  
+  // 초기 로드 시에도 확인
+  checkAuthRequired()
 })
 
 onUnmounted(() => {
