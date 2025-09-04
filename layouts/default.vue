@@ -52,7 +52,7 @@
             </q-btn>
           </div>
           <div class="q-gutter-sm q-ml-md gt-sm" style="margin-right:32px; display:flex; align-items:center;">
-            <template v-if="!isLoggedIn">
+            <template v-if="!isAuthenticated">
               <q-btn flat dense no-caps class="profile-btn" label="로그인" @click="$router.push('/login')" />
               <q-btn flat dense no-caps class="profile-btn signup-btn" label="회원가입" @click="$router.push('/signup')" />
             </template>
@@ -83,6 +83,12 @@
           <NuxtPage />
         </transition>
       </q-page-container>
+      
+      <!-- 로그아웃 로딩 오버레이 -->
+      <LogoutOverlay ref="logoutOverlay" />
+      
+      <!-- 로그아웃 완료 토스트 -->
+      <LogoutToast ref="logoutToast" />
     </q-layout>
   </template>
 
@@ -104,12 +110,13 @@ const menu = [
 const route = useRoute()
 const router = useRouter()
 
-const isLoggedIn = ref(false)
-const user = ref({
-  name: '',
-  email: '',
-  avatar: '/images/user.png'
-})
+// 컴포넌트 참조
+const logoutOverlay = ref(null)
+const logoutToast = ref(null)
+
+// useAuth composable 사용
+const { isAuthenticated, user, logout: authLogout } = useAuth()
+
 const profileMenu = ref(false)
 const profileBtnRef = ref(null)
 const profileMenu2 = ref(false)
@@ -122,24 +129,7 @@ function random(min, max) {
   return Math.random() * (max - min) + min
 }
 
-function syncLoginState() {
-  isLoggedIn.value = !!localStorage.getItem('access_token')
-  const userInfo = localStorage.getItem('user')
-  if (userInfo) {
-    try {
-      user.value = JSON.parse(userInfo)
-    } catch (e) {
-      user.value = { name: '', email: '', avatar: '/images/user.png' }
-    }
-  } else {
-    user.value = { name: '', email: '', avatar: '/images/user.png' }
-  }
-}
-
 onMounted(() => {
-  syncLoginState()
-  window.addEventListener('login', syncLoginState)
-  window.addEventListener('logout', syncLoginState)
   clouds.value = Array.from({ length: 4 }, () => ({
     top: random(10, 70) + 'vh',
     left: random(0, 80) + 'vw',
@@ -156,6 +146,11 @@ onMounted(() => {
 })
 
 async function logout() {
+  // 로딩 오버레이 표시
+  if (logoutOverlay.value) {
+    logoutOverlay.value.showOverlay()
+  }
+  
   try {
     const access_token = localStorage.getItem('access_token')
     if (access_token) {
@@ -169,11 +164,23 @@ async function logout() {
   } catch (err) {
     console.log('로그아웃 API 호출 실패:', err)
   } finally {
-    isLoggedIn.value = false
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('user')
-    window.dispatchEvent(new Event('logout'))
+    // 최소 1.5초 로딩 표시
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    // 로딩 오버레이 숨기기
+    if (logoutOverlay.value) {
+      logoutOverlay.value.hideOverlay()
+    }
+    
+    // 로그아웃 처리
+    authLogout()
+    
+    // 완료 토스트 표시
+    if (logoutToast.value) {
+      logoutToast.value.showToast()
+    }
+    
+    // 메인 페이지로 이동
     router.push('/')
   }
 }
@@ -183,15 +190,6 @@ function goToProfile() {
   $router.push('/info')
 }
 
-// 로그인 후 user 정보 저장을 위해 전역 expose
-if (process.client) {
-  window.setUserInfo = (userInfo) => {
-    user.value = userInfo
-    localStorage.setItem('user', JSON.stringify(userInfo))
-    isLoggedIn.value = true
-    window.dispatchEvent(new Event('login'))
-  }
-}
 </script>
 
 <style src="~/assets/theme.css"></style>

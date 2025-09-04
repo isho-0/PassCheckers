@@ -20,12 +20,18 @@ export const useAuth = () => {
   }
 
   // 로그인
-  const login = (token: string, userData: any) => {
+  const login = (token: string, userData: any, refreshToken?: string) => {
     if (process.client) {
       localStorage.setItem('access_token', token)
       localStorage.setItem('user', JSON.stringify(userData))
+      if (refreshToken) {
+        localStorage.setItem('refresh_token', refreshToken)
+      }
       isAuthenticated.value = true
       user.value = userData
+      
+      // 전역 이벤트 발생
+      window.dispatchEvent(new Event('login'))
     }
   }
 
@@ -37,6 +43,9 @@ export const useAuth = () => {
       localStorage.removeItem('user')
       isAuthenticated.value = false
       user.value = null
+      
+      // 전역 이벤트 발생
+      window.dispatchEvent(new Event('logout'))
     }
   }
 
