@@ -279,7 +279,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 
-const { isAuthenticated, user, logout } = useAuth()
+const { isAuthenticated, user } = useAuth()
 const parallaxOffset = ref(0)
 const router = useRouter()
 const route = useRoute()
@@ -345,7 +345,7 @@ onUnmounted(() => {
 .hero-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 6rem 2rem 0 2rem;
+  padding: 4rem 2rem 0 2rem;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4rem;
