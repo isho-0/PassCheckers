@@ -285,9 +285,17 @@ const router = useRouter()
 const route = useRoute()
 const showAuthToast = ref(false)
 
-// 페이지 네비게이션 함수
-const navigateTo = (path) => {
-  router.push(path)
+// 페이지 네비게이션 함수 (로딩 효과 포함)
+const navigateTo = async (path) => {
+  // 현재 페이지와 같은 경우 무시
+  if (route.path === path) return
+  
+  try {
+    // 페이지 이동
+    await router.push(path)
+  } catch (error) {
+    console.error('페이지 이동 실패:', error)
+  }
 }
 
 
@@ -301,10 +309,14 @@ onMounted(() => {
   window.addEventListener('scroll', handleScroll)
   
   // 쿼리 파라미터 확인하여 토스트 표시
+  console.log('Route query:', route.query)
   if (route.query.auth_required === 'true') {
+    console.log('Showing auth toast')
     showAuthToast.value = true
-    // URL에서 쿼리 파라미터 제거
-    router.replace('/')
+    // 토스트가 표시된 후 URL에서 쿼리 파라미터 제거 (약간의 지연)
+    setTimeout(() => {
+      router.replace('/')
+    }, 100)
   }
 })
 

@@ -1,6 +1,8 @@
+// 전역 상태로 관리
+const isAuthenticated = ref(false)
+const user = ref(null)
+
 export const useAuth = () => {
-  const isAuthenticated = ref(false)
-  const user = ref(null)
 
   // 로컬 스토리지에서 인증 상태 확인
   const checkAuth = () => {
@@ -30,6 +32,8 @@ export const useAuth = () => {
       isAuthenticated.value = true
       user.value = userData
       
+      console.log('로그인 상태 업데이트:', { isAuthenticated: isAuthenticated.value, user: user.value })
+      
       // 전역 이벤트 발생
       window.dispatchEvent(new Event('login'))
     }
@@ -49,16 +53,22 @@ export const useAuth = () => {
     }
   }
 
-  // 초기화
-  onMounted(() => {
-    checkAuth()
-  })
-
   return {
     isAuthenticated: readonly(isAuthenticated),
     user: readonly(user),
     login,
     logout,
     checkAuth
+  }
+}
+
+// 앱 시작 시 한 번만 초기화
+if (process.client) {
+  const accessToken = localStorage.getItem('access_token')
+  const userData = localStorage.getItem('user')
+  
+  if (accessToken && userData) {
+    isAuthenticated.value = true
+    user.value = JSON.parse(userData)
   }
 }

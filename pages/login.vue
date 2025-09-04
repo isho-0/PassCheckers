@@ -77,6 +77,12 @@
         </div>
       </q-btn>
     </div>
+    
+    <!-- 로그인 로딩 오버레이 -->
+    <LoginOverlay ref="loginOverlay" />
+    
+    <!-- 로그인 완료 토스트 -->
+    <LoginToast ref="loginToast" />
   </div>
 </template>
 
@@ -94,6 +100,10 @@ const passwordError = ref('')
 const message = ref('')
 const router = useRouter()
 
+// 컴포넌트 참조
+const loginOverlay = ref(null)
+const loginToast = ref(null)
+
 function validate() {
   userIdError.value = !userId.value ? '아이디(이메일)를 입력하세요' : ''
   passwordError.value = !password.value ? '비밀번호를 입력하세요' : ''
@@ -102,6 +112,12 @@ function validate() {
 
 async function onLogin() {
   if (!validate()) return
+  
+  // 로딩 오버레이 표시
+  if (loginOverlay.value) {
+    loginOverlay.value.showOverlay()
+  }
+  
   try {
     const res = await $fetch('http://' + window.location.hostname + ':5001/api/login', {
       method: 'POST',
@@ -111,12 +127,32 @@ async function onLogin() {
       }
     })
     
+    // 최소 1.5초 로딩 표시
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    // 로딩 오버레이 숨기기
+    if (loginOverlay.value) {
+      loginOverlay.value.hideOverlay()
+    }
+    
     // 인증 상태 업데이트
     const { login } = useAuth()
     login(res.access_token, res.user, res.refresh_token)
     
-    router.push('/')
+    // 완료 토스트 표시
+    if (loginToast.value) {
+      loginToast.value.showToast()
+    }
+    
+    // 약간의 지연 후 메인 페이지로 이동 (상태 업데이트 시간 확보)
+    setTimeout(() => {
+      router.push('/')
+    }, 200)
   } catch (err) {
+    // 로딩 오버레이 숨기기
+    if (loginOverlay.value) {
+      loginOverlay.value.hideOverlay()
+    }
     message.value = err.data?.error || '로그인 실패'
   }
 }
