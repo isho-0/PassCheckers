@@ -3,4 +3,10 @@
     <h1>공유</h1>
     <p>이곳은 공유 기능 페이지입니다.</p>
   </div>
-</template> 
+</template>
+
+<script setup>
+definePageMeta({
+  middleware: 'auth'
+})
+</script> 

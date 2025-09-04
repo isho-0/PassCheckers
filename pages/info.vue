@@ -3,4 +3,10 @@
     <h1>여행 정보</h1>
     <p>이곳은 여행 정보 기능 페이지입니다.</p>
   </div>
-</template> 
+</template>
+
+<script setup>
+definePageMeta({
+  middleware: 'auth'
+})
+</script> 
