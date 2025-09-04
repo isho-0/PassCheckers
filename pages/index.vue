@@ -67,7 +67,7 @@
     </section>
 
     <!-- 수하물 무게 예측 섹션 -->
-    <section class="service-section weight-section" @click="navigateTo('/weight')">
+    <section class="service-section weight-section">
       <div class="section-background" :style="{ transform: `translateY(${parallaxOffset * 0.3}px)` }"></div>
       <div class="section-content">
         <div class="card-header">
@@ -95,13 +95,13 @@
           </div>
         </div>
         <div class="card-footer">
-          <button class="action-button">무게 측정</button>
+          <button class="action-button" @click="navigateTo('/weight')">무게 측정</button>
         </div>
       </div>
     </section>
 
     <!-- 수하물 패킹 섹션 -->
-    <section class="service-section packing-section" @click="navigateTo('/packing')">
+    <section class="service-section packing-section">
       <div class="section-background" :style="{ transform: `translateY(${parallaxOffset * 0.3}px)` }"></div>
       <div class="section-content">
         <div class="card-header">
@@ -129,13 +129,13 @@
           </div>
         </div>
         <div class="card-footer">
-          <button class="action-button">패킹 시작</button>
+          <button class="action-button" @click="navigateTo('/packing')">패킹 시작</button>
         </div>
       </div>
     </section>
 
     <!-- 커뮤니티 섹션 -->
-    <section class="service-section community-section" @click="navigateTo('/community')">
+    <section class="service-section community-section">
       <div class="section-background" :style="{ transform: `translateY(${parallaxOffset * 0.3}px)` }"></div>
       <div class="section-content">
         <div class="card-header">
@@ -163,13 +163,13 @@
           </div>
         </div>
         <div class="card-footer">
-          <button class="action-button">커뮤니티 참여</button>
+          <button class="action-button" @click="navigateTo('/community')">커뮤니티 참여</button>
         </div>
       </div>
     </section>
 
     <!-- 여행 추천 섹션 -->
-    <section class="service-section recommend-section" @click="navigateTo('/recommend')">
+    <section class="service-section recommend-section">
       <div class="section-background" :style="{ transform: `translateY(${parallaxOffset * 0.3}px)` }"></div>
       <div class="section-content">
         <div class="card-header">
@@ -197,13 +197,13 @@
           </div>
         </div>
         <div class="card-footer">
-          <button class="action-button">추천 받기</button>
+          <button class="action-button" @click="navigateTo('/recommend')">추천 받기</button>
         </div>
       </div>
     </section>
 
     <!-- 여행 정보 섹션 -->
-    <section class="service-section info-section" @click="navigateTo('/info')">
+    <section class="service-section info-section">
       <div class="section-background" :style="{ transform: `translateY(${parallaxOffset * 0.3}px)` }"></div>
       <div class="section-content">
         <div class="card-header">
@@ -231,13 +231,13 @@
           </div>
         </div>
         <div class="card-footer">
-          <button class="action-button">정보 확인</button>
+          <button class="action-button" @click="navigateTo('/info')">정보 확인</button>
         </div>
       </div>
     </section>
 
     <!-- 공유 섹션 -->
-    <section class="service-section share-section" @click="navigateTo('/share')">
+    <section class="service-section share-section">
       <div class="section-background" :style="{ transform: `translateY(${parallaxOffset * 0.3}px)` }"></div>
       <div class="section-content">
         <div class="card-header">
@@ -246,26 +246,26 @@
         </div>
         <div class="card-body">
           <p class="card-description-large">
-            여행 경험과 정보를 다른 사람들과 공유하세요.<br>
-            소중한 여행 추억과 유용한 정보를 더 많은 사람들과 나누어보세요.
+            수하물 분류 결과를 바탕으로 여행 물품을 공유하세요.<br>
+            친구와 함께 여행할 때 서로 필요한 물품만 가져가도록 도와드립니다.
           </p>
           <div class="feature-list">
             <div class="feature-item">
-              <span class="feature-icon">📸</span>
-              <span>사진 공유</span>
+              <span class="feature-icon">🤝</span>
+              <span>물품 공유</span>
             </div>
             <div class="feature-item">
-              <span class="feature-icon">📝</span>
-              <span>여행기 작성</span>
+              <span class="feature-icon">📋</span>
+              <span>체크리스트</span>
             </div>
             <div class="feature-item">
-              <span class="feature-icon">🔗</span>
-              <span>SNS 연동</span>
+              <span class="feature-icon">👥</span>
+              <span>그룹 여행</span>
             </div>
           </div>
         </div>
         <div class="card-footer">
-          <button class="action-button">공유하기</button>
+          <button class="action-button" @click="navigateTo('/share')">공유하기</button>
         </div>
       </div>
     </section>
@@ -410,7 +410,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   overflow: hidden;
 }
 
@@ -557,6 +556,8 @@ onUnmounted(() => {
   font-weight: 500;
   font-size: 1.1rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+  user-select: none;
 }
 
 .feature-icon {
