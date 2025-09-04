@@ -22,3 +22,4 @@ PyJWT==2.8.0
 # AI / Machine Learning
 # (설치 시 torch, torchvision 등 관련 패키지가 자동으로 설치됩니다)
 ultralytics==8.3.128
+Pillow

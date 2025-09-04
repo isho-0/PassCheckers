@@ -19,13 +19,20 @@
       <div style="text-align:center; color:#888; font-size:1rem; margin-bottom:24px;">
         수하물 이미지를 업로드하면 분류 결과를 확인하세요
       </div>
-      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:220px; border:1.5px dashed #cbe3f7; border-radius:16px; background:#fff; margin-bottom:18px;">
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:220px; border:1.5px dashed #cbe3f7; border-radius:16px; background:#fff; margin-bottom:18px; position: relative;">
+        <!-- 로딩 오버레이 -->
+        <div v-if="isUploading" class="loading-overlay">
+          <q-spinner-dots color="primary" size="3.5em" />
+          <div class="q-mt-md text-primary">이미지를 분석하고 있습니다...</div>
+        </div>
+
         <input
           ref="fileInput"
           type="file"
           accept="image/jpeg, image/png, image/gif"
           style="display: none"
           @change="onFileSelected"
+          :disabled="isUploading"
         />
         <q-icon name="image" size="48px" color="grey-4" style="margin-bottom:12px;" />
         <div style="color:#888; font-size:1.1rem; margin-bottom:8px;">이미지를 업로드하세요</div>
@@ -37,7 +44,11 @@
           style="margin-bottom:8px;"
           class="file-upload-btn"
           @click="onSelectFileClick"
+          :loading="isUploading"
         />
+      </div>
+      <div v-if="errorMessage" class="text-center text-negative q-mb-md">
+        {{ errorMessage }}
       </div>
       <div style="text-align:center; color:#bbb; font-size:0.95rem;">
         지원되는 이미지 형식: JPG, PNG, GIF<br />최대 파일 크기: 10MB
@@ -73,19 +84,71 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 const fileInput = ref(null)
+const isUploading = ref(false)
+const errorMessage = ref('')
+const router = useRouter()
 
 const onSelectFileClick = () => {
   fileInput.value?.click()
 }
 
-const onFileSelected = (event) => {
-  const files = event.target.files
-  if (files && files.length > 0) {
-    // TODO: 선택된 파일 처리
-    console.log('Selected file:', files[0])
-    // 여기에 파일 업로드 로직을 추가할 수 있습니다.
+const onFileSelected = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  isUploading.value = true
+  errorMessage.value = ''
+  const formData = new FormData()
+  formData.append('image', file)
+
+  try {
+    const result = await $fetch('http://localhost:5001/classify', {
+      method: 'POST',
+      body: formData
+    })
+
+    // 성공 시, 결과 페이지로 이동 (결과와 이미지 URL을 쿼리로 전달)
+    const imageURL = URL.createObjectURL(file)
+    router.push({
+      path: '/classification_result',
+      query: { 
+        results: JSON.stringify(result),
+        image: imageURL
+      }
+    })
+
+  } catch (error) {
+    console.error('Upload failed:', error)
+    errorMessage.value = error.data?.error || '파일 업로드 또는 분석에 실패했습니다.'
+  } finally {
+    isUploading.value = false
   }
 }
 </script>
+
+<style scoped>
+.page-section {
+  border-radius: 20px;
+  padding: 32px;
+  margin: 0 auto;
+  max-width: 1200px;
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 16px;
+}
+</style>

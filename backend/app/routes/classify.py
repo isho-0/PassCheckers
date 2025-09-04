@@ -4,17 +4,24 @@ from app.sku.detect import predict_bbox_with_sku, save_cropped_images
 from app.yolo.detect import predict_name_with_yolo
 from app.db.database import get_engine, fetch_item_info, insert_image, insert_detected_item
 from app.matching.matcher import map_yolo_name
+from PIL import Image
+import io
 
 classify_bp = Blueprint("classify", __name__)
 
 def run_detection(img_bytes, conn, image_id):
     """
-    YOLO + SKU 탐지 후 DB 저장 및 결과 조합
+    YOLO + SKU 탐지 후 DB 저장 및 결과 조합.
+    결과와 함께 이미지 너비, 높이를 반환합니다.
     """
+    # 이미지 크기 가져오기
+    image = Image.open(io.BytesIO(img_bytes))
+    img_width, img_height = image.size
+
     bboxes = predict_bbox_with_sku(img_bytes)
 
     # 테스트용 코드
-    save_cropped_images(img_bytes, bboxes, image_id)
+    # save_cropped_images(img_bytes, bboxes, image_id)
     yolo_predictions = predict_name_with_yolo(img_bytes, bboxes)
 
     enriched_results = []
@@ -27,21 +34,30 @@ def run_detection(img_bytes, conn, image_id):
         db_info = fetch_item_info(item_name_en)
         item_name_ko = db_info["item_name"] if db_info else item_name_en
 
-        # 3️⃣ 탐지 결과 DB 저장
+        # 3️⃣ 탐지 결과 DB 저장 (원본 픽셀 좌표로 저장)
         insert_detected_item(conn, image_id, item_name_en, item_name_ko, p["bbox"])
 
-        # 4️⃣ 결과 조합
+        # 4️⃣ 프론트엔드로 보낼 bbox 좌표 정규화 (0~1 사이 값으로)
+        x_min, y_min, x_max, y_max = p["bbox"]
+        normalized_bbox = [
+            x_min / img_width,
+            y_min / img_height,
+            x_max / img_width,
+            y_max / img_height
+        ]
+
+        # 5️⃣ 결과 조합
         enriched_results.append({
             "name_ko": item_name_ko,
             "name_en": item_name_en,
-            "bbox": p["bbox"],
+            "bbox": normalized_bbox, # 정규화된 좌표 사용
             "confidence": p["confidence"],
             "carry_on_allowed": db_info["carry_on_allowed"] if db_info else None,
             "checked_baggage_allowed": db_info["checked_baggage_allowed"] if db_info else None,
             "notes": db_info["notes"] if db_info else "DB에 규정 정보 없음"
         })
 
-    return enriched_results
+    return enriched_results, img_width, img_height
 
 
 @classify_bp.route("/classify", methods=["POST"])
@@ -62,11 +78,12 @@ def classify():
             image_id = insert_image(conn, user_id="custom1", image_bytes=img_bytes)
 
             # --- 탐지 + DB 저장 + 결과 조합 ---
-            results = run_detection(img_bytes, conn, image_id)
+            results, img_width, img_height = run_detection(img_bytes, conn, image_id)
 
             return jsonify({
                 "message": "Detection and classification complete.",
                 "image_id": image_id,
+                "image_size": {"width": img_width, "height": img_height},
                 "results": results
             })
 
