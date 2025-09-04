@@ -1,65 +1,16 @@
-from flask import Flask, request, jsonify
-from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required, get_jwt_identity
-from flask_cors import CORS
-import redis
-import pymysql
-import os
-from datetime import timedelta
-from config import Config
-from urllib.parse import urlparse
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from functools import wraps
+import redis
+from config import Config
 from repository.user_repo import UserRepository
 from service.user_service import UserService, UserExistsException, InvalidCredentialsException
+from app.db.database import get_db_connection
 
-app = Flask(__name__)
-app.config.from_object(Config)
-
-# JWT 설정
-jwt = JWTManager(app)
-
-# CORS 설정
-CORS(app, origins=Config.CORS_ORIGINS, supports_credentials=True)
+auth_bp = Blueprint('auth', __name__, url_prefix='/api')
 
 # Redis 연결
 redis_client = redis.from_url(Config.REDIS_URL)
-
-# MySQL 연결
-def get_db_connection():
-    url = os.environ.get('DATABASE_URL')
-    if url is None:
-        raise Exception("DATABASE_URL 환경변수가 설정되지 않았습니다.")
-
-    parsed = urlparse(url)
-    return pymysql.connect(
-        host=parsed.hostname,
-        user=parsed.username,
-        password=parsed.password,
-        database=parsed.path.lstrip('/'),
-        port=parsed.port or 3306,
-        charset='utf8mb4',
-        cursorclass=pymysql.cursors.DictCursor
-    )
-
-# 데이터베이스 초기화 (변경된 스키마 적용)
-def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # users 테이블 생성 (user_id를 기본 키로 사용)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS `users` (
-            `user_id` INT NOT NULL PRIMARY KEY,
-            `email` VARCHAR(255) NOT NULL UNIQUE,
-            `password` VARCHAR(255) NOT NULL, -- 암호화된 해시 저장
-            `name` VARCHAR(255) NOT NULL,
-            `nickname` VARCHAR(255) NOT NULL,
-            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
 
 def api_handler(required_fields=None):
     def decorator(func):
@@ -77,21 +28,17 @@ def api_handler(required_fields=None):
         return wrapper
     return decorator
 
-# API 라우트
-
-@app.route('/api/health', methods=['GET'])
+@auth_bp.route('/health', methods=['GET'])
 def health_check():
-    """서버 상태 확인"""
     return jsonify({'status': 'healthy', 'message': 'Server is running'})
 
-@app.route('/api/register', methods=['POST'])
+@auth_bp.route('/register', methods=['POST'])
 @api_handler(required_fields=['id', 'email', 'password', 'name', 'nickname'])
 def register(data):
     conn = get_db_connection()
     user_repo = UserRepository(conn)
     user_service = UserService(user_repo)
     try:
-        # 프론트에서 받은 id를 user_id로 사용
         user = user_service.register(
             data['id'], data['email'], data['password'], data['name'], data['nickname']
         )
@@ -107,7 +54,7 @@ def register(data):
         conn.close()
         return jsonify({'error': '서버 오류가 발생했습니다'}), 500
 
-@app.route('/api/login', methods=['POST'])
+@auth_bp.route('/login', methods=['POST'])
 @api_handler(required_fields=['email', 'password'])
 def login(data):
     conn = get_db_connection()
@@ -116,7 +63,6 @@ def login(data):
     try:
         user = user_service.login(data['email'], data['password'])
         conn.close()
-        # JWT 토큰에 user_id를 담음
         access_token = create_access_token(identity=user['user_id'])
         refresh_token = create_refresh_token(identity=user['user_id'])
         redis_client.setex(
@@ -137,7 +83,7 @@ def login(data):
         conn.close()
         return jsonify({'error': '서버 오류가 발생했습니다'}), 500
 
-@app.route('/api/refresh', methods=['POST'])
+@auth_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)
 @api_handler()
 def refresh(data=None):
@@ -148,7 +94,7 @@ def refresh(data=None):
     new_access_token = create_access_token(identity=current_user_id)
     return jsonify({'access_token': new_access_token}), 200
 
-@app.route('/api/logout', methods=['POST'])
+@auth_bp.route('/logout', methods=['POST'])
 @jwt_required()
 @api_handler()
 def logout(data=None):
@@ -156,7 +102,7 @@ def logout(data=None):
     redis_client.delete(f"refresh_token:{current_user_id}")
     return jsonify({'message': '로그아웃되었습니다'}), 200
 
-@app.route('/api/profile', methods=['GET'])
+@auth_bp.route('/profile', methods=['GET'])
 @jwt_required()
 @api_handler()
 def get_profile(data=None):
@@ -169,7 +115,7 @@ def get_profile(data=None):
         return jsonify({'error': '사용자를 찾을 수 없습니다'}), 404
     return jsonify({'user': user}), 200
 
-@app.route('/api/protected', methods=['GET'])
+@auth_bp.route('/protected', methods=['GET'])
 @jwt_required()
 @api_handler()
 def protected(data=None):
@@ -178,10 +124,3 @@ def protected(data=None):
         'message': '인증된 사용자만 접근 가능합니다',
         'user_id': current_user_id
     }), 200
-
-if __name__ == '__main__':
-    # 앱 실행 시 데이터베이스 초기화
-    init_db()
-    
-    # 개발 서버 실행
-    app.run(debug=True, host='0.0.0.0', port=5001)

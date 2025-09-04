@@ -1,0 +1,56 @@
+-- 메인 테이블 items(위에거가 안되면 아래걸로)
+CREATE TABLE `items` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `item_name` VARCHAR(255) NOT NULL COLLATE utf8mb4_unicode_ci,
+  `carry_on_allowed` TEXT COLLATE utf8mb4_unicode_ci,
+  `checked_baggage_allowed` TEXT COLLATE utf8mb4_unicode_ci,
+  `notes` TEXT COLLATE utf8mb4_unicode_ci,
+  `item_name_EN` VARCHAR(255) NOT NULL COLLATE utf8mb4_unicode_ci UNIQUE,
+  `notes_EN` TEXT COLLATE utf8mb4_unicode_ci,
+  `source` TEXT COLLATE utf8mb4_unicode_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `items` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `item_name` VARCHAR(255) NOT NULL,
+  `carry_on_allowed` TEXT,
+  `checked_baggage_allowed` TEXT,
+  `notes` TEXT ,
+  `item_name_EN` VARCHAR(255) NOT NULL UNIQUE,
+  `notes_EN` TEXT,
+  `source` TEXT 
+) 
+
+
+-- 이미지 & bbox 정보 테이블
+CREATE TABLE `images` (
+  `image_id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `user_id` VARCHAR(255) NOT NULL,
+  `image_data` LONGBLOB NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE `detected_items` (
+  `item_id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `image_id` INT NOT NULL,
+  `item_name_EN` VARCHAR(255) NOT NULL,
+  `item_name` VARCHAR(255) NOT NULL,
+  `bbox_x_min` FLOAT NOT NULL,
+  `bbox_y_min` FLOAT NOT NULL,
+  `bbox_x_max` FLOAT NOT NULL,
+  `bbox_y_max` FLOAT NOT NULL,
+  `packing_info` ENUM('carry_on','checked','both','none') DEFAULT 'none' NOT NULL,
+  FOREIGN KEY (`image_id`) REFERENCES `images`(`image_id`) ON DELETE CASCADE,
+  FOREIGN KEY (`item_name_EN`) REFERENCES `items`(`item_name_EN`) ON UPDATE CASCADE
+);
+
+--user table
+CREATE TABLE `users` (
+  `user_id` VARCHAR(255) NOT NULL PRIMARY KEY,
+  `email` VARCHAR(255) NOT NULL UNIQUE,
+  `password` VARCHAR(255) NOT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `nickname` VARCHAR(255) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

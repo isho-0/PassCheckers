@@ -1,8 +1,24 @@
-Flask==3.0.0
+# Web Framework
+Flask==3.1.0
 Flask-JWT-Extended==4.6.0
 Flask-CORS==4.0.0
+
+# Database
+SQLAlchemy==2.0.30
+Flask-SQLAlchemy==3.1.1
+PyMySQL==1.1.1
+
+# Data Processing & Utilities
+pandas==2.2.2
+requests==2.32.3
+BeautifulSoup4==4.12.2
+deep-translator==1.11.4
+rapidfuzz==3.9.3
 redis==5.0.1
-PyMySQL==1.1.0
 python-dotenv==1.0.0
 bcrypt==4.1.2
-PyJWT==2.8.0 
+PyJWT==2.8.0
+
+# AI / Machine Learning
+# (설치 시 torch, torchvision 등 관련 패키지가 자동으로 설치됩니다)
+ultralytics==8.3.128

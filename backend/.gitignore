@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env
+
+# Flask instance folder and uploads
+instance/
+uploads/
+
+# VSCode settings
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Ignore model weights
+app/yolo/weights/
+app/sku/weights/
+
+# Ignore generated data files
+tsa_items*.csv
+
+# Ignore KEYS
+config.py
+
+# Node/npm
+package-lock.json
+node_modules/

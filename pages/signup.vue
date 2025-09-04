@@ -8,13 +8,24 @@
         placeholder="이메일 주소"
         outlined
         dense
-        class="login-input opaque-bg"
+        class="login-input"
         :rules="[val => !!val || '이메일 주소를 입력하세요']"
         :error="!!emailError"
         :error-message="emailError"
         :hide-bottom-space="true"
-        :hide-hint="true"
-        :hide-error-icon="true"
+        style="margin-bottom:18px;"
+      />
+      <q-input
+        v-model="id"
+        type="text"
+        placeholder="아이디"
+        outlined
+        dense
+        class="login-input"
+        :rules="[val => !!val || '아이디를 입력하세요']"
+        :error="!!idError"
+        :error-message="idError"
+        :hide-bottom-space="true"
         style="margin-bottom:18px;"
       />
       <q-input
@@ -23,13 +34,11 @@
         placeholder="비밀번호"
         outlined
         dense
-        class="login-input opaque-bg"
+        class="login-input"
         :rules="[val => !!val || '비밀번호를 입력하세요']"
         :error="!!passwordError"
         :error-message="passwordError"
         :hide-bottom-space="true"
-        :hide-hint="true"
-        :hide-error-icon="true"
         style="margin-bottom:18px;"
       >
         <template #append>
@@ -42,18 +51,38 @@
         </template>
       </q-input>
       <q-input
+        v-model="passwordCheck"
+        :type="showPasswordCheck ? 'text' : 'password'"
+        placeholder="비밀번호 확인"
+        outlined
+        dense
+        class="login-input"
+        :rules="[val => !!val || '비밀번호를 다시 입력하세요', val => val === password || '비밀번호가 일치하지 않습니다']"
+        :error="!!passwordCheckError"
+        :error-message="passwordCheckError"
+        :hide-bottom-space="true"
+        style="margin-bottom:18px;"
+      >
+        <template #append>
+          <q-icon
+            :name="showPasswordCheck ? 'visibility_off' : 'visibility'"
+            class="cursor-pointer eye-icon"
+            @click="showPasswordCheck = !showPasswordCheck"
+            color="grey-6"
+          />
+        </template>
+      </q-input>
+      <q-input
         v-model="name"
         type="text"
         placeholder="성명"
         outlined
         dense
-        class="login-input opaque-bg"
+        class="login-input"
         :rules="[val => !!val || '성명을 입력하세요']"
         :error="!!nameError"
         :error-message="nameError"
         :hide-bottom-space="true"
-        :hide-hint="true"
-        :hide-error-icon="true"
         style="margin-bottom:18px;"
       />
       <q-input
@@ -62,13 +91,11 @@
         placeholder="닉네임"
         outlined
         dense
-        class="login-input opaque-bg"
+        class="login-input"
         :rules="[val => !!val || '닉네임을 입력하세요']"
         :error="!!nicknameError"
         :error-message="nicknameError"
         :hide-bottom-space="true"
-        :hide-hint="true"
-        :hide-error-icon="true"
         style="margin-bottom:8px;"
       />
       <q-btn
@@ -95,19 +122,26 @@
       </div>
     </div>
   </div>
-</template> 
+</template>
 
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const email = ref('')
+const id = ref('')
+const userId = ref('')
 const password = ref('')
+const passwordCheck = ref('')
 const name = ref('')
 const nickname = ref('')
 const showPassword = ref(false)
+const showPasswordCheck = ref(false)
 const emailError = ref('')
+const idError = ref('')
+const userIdError = ref('')
 const passwordError = ref('')
+const passwordCheckError = ref('')
 const nameError = ref('')
 const nicknameError = ref('')
 const message = ref('')
@@ -116,10 +150,13 @@ const router = useRouter()
 
 const validate = () => {
   emailError.value = !email.value ? '이메일 주소를 입력하세요' : ''
+  idError.value = !id.value ? '아이디를 입력하세요' : ''
   passwordError.value = !password.value ? '비밀번호를 입력하세요' : ''
+  passwordCheckError.value = !passwordCheck.value ? '비밀번호 확인을 입력하세요' : (password.value !== passwordCheck.value ? '비밀번호가 일치하지 않습니다' : '')
   nameError.value = !name.value ? '성명을 입력하세요' : ''
   nicknameError.value = !nickname.value ? '닉네임을 입력하세요' : ''
-  return !(emailError.value || passwordError.value || nameError.value || nicknameError.value)
+
+  return !(emailError.value || idError.value || passwordError.value || passwordCheckError.value || nameError.value || nicknameError.value)
 }
 
 const onRegister = async () => {
@@ -129,6 +166,7 @@ const onRegister = async () => {
       method: 'POST',
       body: {
         email: email.value,
+        id: id.value,
         password: password.value,
         name: name.value,
         nickname: nickname.value
@@ -169,7 +207,7 @@ const goToLogin = () => {
   flex-direction: column;
 }
 .login-input {
-  width: 100%;
+  width: 100%; 
 }
 .opaque-bg .q-field__control, .opaque-bg .q-field__native {
   background: #fff !important;
@@ -290,4 +328,4 @@ const goToLogin = () => {
 .emoji {
   margin-left: 4px;
 }
-</style> 
+</style>

@@ -20,10 +20,24 @@
         수하물 이미지를 업로드하면 분류 결과를 확인하세요
       </div>
       <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:220px; border:1.5px dashed #cbe3f7; border-radius:16px; background:#fff; margin-bottom:18px;">
+        <input
+          ref="fileInput"
+          type="file"
+          accept="image/jpeg, image/png, image/gif"
+          style="display: none"
+          @change="onFileSelected"
+        />
         <q-icon name="image" size="48px" color="grey-4" style="margin-bottom:12px;" />
         <div style="color:#888; font-size:1.1rem; margin-bottom:8px;">이미지를 업로드하세요</div>
         <div style="color:#bbb; font-size:0.95rem; margin-bottom:12px;">이미지를 드래그 앤 드롭하거나 파일을 선택하세요</div>
-        <q-btn color="primary" label="파일 선택하기" unelevated style="margin-bottom:8px;" class="file-upload-btn" />
+        <q-btn
+          color="primary"
+          label="파일 선택하기"
+          unelevated
+          style="margin-bottom:8px;"
+          class="file-upload-btn"
+          @click="onSelectFileClick"
+        />
       </div>
       <div style="text-align:center; color:#bbb; font-size:0.95rem;">
         지원되는 이미지 형식: JPG, PNG, GIF<br />최대 파일 크기: 10MB
@@ -56,3 +70,22 @@
     </div>
   </div>
 </template>
+
+<script setup>
+import { ref } from 'vue'
+
+const fileInput = ref(null)
+
+const onSelectFileClick = () => {
+  fileInput.value?.click()
+}
+
+const onFileSelected = (event) => {
+  const files = event.target.files
+  if (files && files.length > 0) {
+    // TODO: 선택된 파일 처리
+    console.log('Selected file:', files[0])
+    // 여기에 파일 업로드 로직을 추가할 수 있습니다.
+  }
+}
+</script>
