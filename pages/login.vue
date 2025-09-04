@@ -143,11 +143,6 @@ async function onLogin() {
     if (loginToast.value) {
       loginToast.value.showToast()
     }
-    
-    // 약간의 지연 후 메인 페이지로 이동 (상태 업데이트 시간 확보)
-    setTimeout(() => {
-      router.push('/')
-    }, 200)
   } catch (err) {
     // 로딩 오버레이 숨기기
     if (loginOverlay.value) {

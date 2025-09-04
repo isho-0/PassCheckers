@@ -218,9 +218,6 @@ async function logout() {
     if (logoutToast.value) {
       logoutToast.value.showToast()
     }
-    
-    // 메인 페이지로 이동
-    router.push('/')
   }
 }
 

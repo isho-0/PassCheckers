@@ -29,12 +29,19 @@
 <script setup>
 const show = ref(false)
 
+const router = useRouter()
+
 const showToast = () => {
   show.value = true
 }
 
 const close = () => {
   show.value = false
+  // 확인 버튼 클릭 시 index 페이지로 리디렉션 후 새로고침
+  router.push('/').then(() => {
+    // 페이지 이동 후 새로고침
+    window.location.reload()
+  })
 }
 
 // 외부에서 사용할 수 있도록 expose
