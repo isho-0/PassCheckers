@@ -3,4 +3,10 @@
     <h1>수하물 무게 예측</h1>
     <p>이곳은 수하물 무게 예측 기능 페이지입니다.</p>
   </div>
-</template> 
+</template>
+
+<script setup>
+definePageMeta({
+  middleware: 'auth'
+})
+</script> 
