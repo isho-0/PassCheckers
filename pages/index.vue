@@ -2,11 +2,12 @@
   <div class="main-page">
     <!-- 앱 소개 섹션 -->
     <section class="hero-section">
+      
       <div class="hero-content">
         <div class="hero-text">
           <h1 class="hero-title">
             여행을 더 편리하게, <span class="highlight">수하물 도우미</span>
-      </h1>
+          </h1>
           <p class="hero-description">
             수하물 분류, 무게 예측, 패킹 도우미까지<br>
             여행 준비의 모든 것을 도와드립니다
@@ -269,18 +270,26 @@
         </div>
       </div>
     </section>
+    
+    <!-- 인증 필요 토스트 -->
+    <AuthToast v-if="showAuthToast" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 
+const { isAuthenticated, user, logout } = useAuth()
 const parallaxOffset = ref(0)
+const router = useRouter()
+const route = useRoute()
+const showAuthToast = ref(false)
 
 // 페이지 네비게이션 함수
 const navigateTo = (path) => {
-  navigateTo(path)
+  router.push(path)
 }
+
 
 // 스크롤 이벤트 핸들러
 const handleScroll = () => {
@@ -290,6 +299,13 @@ const handleScroll = () => {
 
 onMounted(() => {
   window.addEventListener('scroll', handleScroll)
+  
+  // 쿼리 파라미터 확인하여 토스트 표시
+  if (route.query.auth_required === 'true') {
+    showAuthToast.value = true
+    // URL에서 쿼리 파라미터 제거
+    router.replace('/')
+  }
 })
 
 onUnmounted(() => {
@@ -306,12 +322,13 @@ onUnmounted(() => {
 .hero-section {
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   background: linear-gradient(135deg, #87CEEB 0%, #B0E0E6 50%, #E0F6FF 100%);
   color: #2c3e50;
   position: relative;
   overflow: hidden;
 }
+
 
 .hero-section::before {
   content: '';
@@ -328,13 +345,14 @@ onUnmounted(() => {
 .hero-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 6rem 2rem 0 2rem;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4rem;
   align-items: center;
   position: relative;
   z-index: 1;
+  flex: 1;
 }
 
 .hero-text {
