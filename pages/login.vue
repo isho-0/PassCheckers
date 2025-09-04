@@ -110,10 +110,16 @@ async function onLogin() {
         password: password.value
       }
     })
+    
+    // 토큰을 로컬 스토리지에 저장
     localStorage.setItem('access_token', res.access_token)
     localStorage.setItem('refresh_token', res.refresh_token)
     localStorage.setItem('user', JSON.stringify(res.user))
-    window.dispatchEvent(new Event('login'))
+    
+    // 인증 상태 업데이트
+    const { login } = useAuth()
+    login(res.access_token, res.user)
+    
     router.push('/')
   } catch (err) {
     message.value = err.data?.error || '로그인 실패'
