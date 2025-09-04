@@ -33,7 +33,7 @@
     </section>
 
     <!-- 수하물 분류 섹션 -->
-    <section class="service-section classification-section" @click="navigateTo('/classification')">
+    <section class="service-section classification-section">
       <div class="section-background" :style="{ transform: `translateY(${parallaxOffset * 0.3}px)` }"></div>
       <div class="section-content">
         <div class="card-header">
@@ -61,7 +61,7 @@
           </div>
         </div>
         <div class="card-footer">
-          <button class="action-button">시작하기</button>
+          <button class="action-button" @click="navigateTo('/classification')">시작하기</button>
         </div>
       </div>
     </section>
