@@ -1,4 +1,4 @@
-from app import db
+from app.db.database import db
 
 class ItemModel(db.Model):
     """
@@ -36,3 +36,38 @@ class ItemModel(db.Model):
 
     def __repr__(self):
         return f"<ItemModel {self.item_name}>"
+
+    @classmethod
+    def get_by_name(cls, item_name):
+        """이름으로 특정 아이템의 상세 정보를 조회합니다."""
+        return cls.query.filter_by(item_name=item_name).first()
+
+    @classmethod
+    def add_item_from_api(cls, item_data):
+        """API (Gemini)로부터 받은 데이터를 기반으로 새 아이템을 추가합니다."""
+        # 허용된 값 목록
+        allowed_carry_on = ["예", "아니요", "예 (특별 지침)", "예 (3.4oz/100 ml 이상 또는 동일)"]
+        allowed_checked = ["예", "아니요", "예 (특별 지침)"]
+
+        # 데이터 유효성 검사 및 기본값 설정
+        carry_on = item_data.get('carry_on_allowed', '아니요')
+        checked = item_data.get('checked_baggage_allowed', '아니요')
+
+        # 허용된 값에 없는 경우 기본값으로 대체
+        if carry_on not in allowed_carry_on:
+            carry_on = '아니요'
+        if checked not in allowed_checked:
+            checked = '아니요'
+
+        new_item = cls(
+            item_name=item_data['item_name'],
+            item_name_EN=item_data.get('item_name_EN'),
+            carry_on_allowed=carry_on,
+            checked_baggage_allowed=checked,
+            notes=item_data.get('notes'),
+            notes_EN=item_data.get('notes_EN'),
+            source='API' # Gemini API를 통해 추가된 항목임을 명시
+        )
+        db.session.add(new_item)
+        db.session.commit()
+        return new_item

@@ -4,9 +4,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
 from config import Config
-
-# db 객체를 전역적으로 생성
-db = SQLAlchemy()
+from .db.database import db  # db 객체를 database.py에서 import
 
 def create_app(config_class=Config):
     app = Flask(__name__)

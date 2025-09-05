@@ -1,3 +1,7 @@
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+
 # app/db/database.py
 import pandas as pd
 from sqlalchemy import create_engine, exc, text

@@ -30,14 +30,16 @@ class ItemsService:
         return ItemModel.get_all_details()
     
     def get_autocomplete_suggestions(self, query, limit=5):
-        if not query:
-            return []
-        
-        # rapidfuzz를 사용하여 더 빠르고 정확하게 유사 항목을 찾습니다.
-        # cutoff는 0-100 사이의 점수입니다.
-        results = process.extract(query, self.item_names, scorer=fuzz.WRatio, limit=limit, score_cutoff=30)
-        # 결과는 (찾은문자열, 점수, 인덱스) 튜플의 리스트이므로, 문자열만 추출합니다.
-        return [result[0] for result in results]
+          if not query:
+              return []
+
+          # WRatio 스코어 75점 이상인 항목만 반환하도록 score_cutoff 값을 상향 조정합니다.
+          # limit은 여전히 5로 유지하여, 최대 5개의 가장 유사한 항목만 가져옵니다.
+          results = process.extract(query, self.item_names, scorer=fuzz.WRatio, limit=limit,
+  score_cutoff=75)
+
+          # 결과는 (찾은문자열, 점수, 인덱스) 튜플의 리스트이므로, 문자열만 추출합니다.
+          return [result[0] for result in results]
     
     def find_best_match(self, query):
         # 가장 유사한 항목 1개를 찾습니다.

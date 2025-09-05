@@ -21,7 +21,7 @@ def run_detection(img_bytes, conn, image_id):
     bboxes = predict_bbox_with_sku(img_bytes)
 
     # 테스트용 코드
-    # save_cropped_images(img_bytes, bboxes, image_id)
+    #save_cropped_images(img_bytes, bboxes, image_id)
     yolo_predictions = predict_name_with_yolo(img_bytes, bboxes)
 
     enriched_results = []
