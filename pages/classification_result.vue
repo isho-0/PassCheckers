@@ -149,6 +149,7 @@
                 >
                   <q-item-section>
                     <q-select
+                      ref="searchSelectRef"
                       v-if="item.isNew"
                       v-model="item.name_ko"
                       label="객체명을 검색하세요"
@@ -159,6 +160,7 @@
                       hide-selected
                       :options="autocompleteSuggestions"
                       @filter="filterFn"
+                      @keyup="handleKeyup"
                       :disable="item.isDeleted"
                     >
                       <template v-slot:no-option>
@@ -167,6 +169,18 @@
                             일치하는 항목이 없습니다.
                           </q-item-section>
                         </q-item>
+                      </template>
+                      <template v-slot:append>
+                        <q-btn
+                          round
+                          dense
+                          flat
+                          icon="check"
+                          @click="resolveItem(item)"
+                          :disable="!item.name_ko"
+                        >
+                          <q-tooltip>항목 확정</q-tooltip>
+                        </q-btn>
                       </template>
                     </q-select>
                     <q-item-label v-else :class="{ 'text-grey-6': item.isDeleted, 'text-strike': item.isDeleted }">{{ item.name_ko }}</q-item-label>
@@ -186,7 +200,8 @@
                     </q-btn>
                     <q-btn
                       :icon="item.isDeleted ? 'undo' : 'delete'"
-                      flat
+                      :flat="!item.isDeleted"
+                      :color="item.isDeleted ? 'grey-5' : ''"
                       round
                       dense
                       @click="toggleDeleteItem(item)"
@@ -227,19 +242,48 @@ const detectionResults = ref([])
 const processedResults = ref([])
 const imageContainerRef = ref(null)
 const hoveredIndex = ref(null)
+const originalImageSize = ref({ width: 1, height: 1 }); // 원본 이미지 크기 저장
 
 // --- Editor Modal State ---
 const showEditModal = ref(false)
 const itemsInEditor = ref([])
 const autocompleteSuggestions = ref([])
 const editorImageContainer = ref(null)
-const editorHoveredIndex = ref(null) // New: For hovering in editor modal
+const editorHoveredIndex = ref(null)
 
 // --- BBox Drawing State ---
 const isDrawing = ref(false)
 const drawStartPoint = ref({ x: 0, y: 0 })
 const drawingRect = ref({ x: 0, y: 0, width: 0, height: 0 })
 const activeDrawIndex = ref(null)
+
+// BBox 스타일 계산 로직을 공통 함수로 추출
+const calculateBoxStyle = (bbox, containerEl, imageSize) => {
+  if (!bbox || !containerEl) return {};
+  
+  const container = containerEl.getBoundingClientRect();
+  const containerRatio = container.width / container.height;
+  const imageRatio = imageSize.width / imageSize.height;
+
+  let scale = 1, offsetX = 0, offsetY = 0;
+  if (imageRatio > containerRatio) {
+    scale = container.width / imageSize.width;
+    offsetY = (container.height - imageSize.height * scale) / 2;
+  } else {
+    scale = container.height / imageSize.height;
+    offsetX = (container.width - imageSize.width * scale) / 2;
+  }
+
+  const [x_min, y_min, x_max, y_max] = bbox;
+  return {
+    position: 'absolute',
+    left: `${(x_min * imageSize.width * scale) + offsetX}px`,
+    top: `${(y_min * imageSize.height * scale) + offsetY}px`,
+    width: `${((x_max - x_min) * imageSize.width) * scale}px`,
+    height: `${((y_max - y_min) * imageSize.height) * scale}px`,
+  };
+};
+
 
 const drawingRectStyle = computed(() => ({
   left: `${drawingRect.value.x}px`,
@@ -295,34 +339,58 @@ const handleMouseMove = (e) => {
   drawingRect.value.height = Math.abs(currentY - startY)
 }
 
-const handleMouseUp = () => {
-  if (!isDrawing.value || activeDrawIndex.value === null) return
-  isDrawing.value = false
+// 그려진 BBox를 정규화된 좌표로 변환하는 함수
+const normalizeBbox = (drawnRect, containerEl, imageSize) => {
+  if (!drawnRect || !containerEl) return null;
+
+  const container = containerEl.getBoundingClientRect();
+  const containerRatio = container.width / container.height;
+  const imageRatio = imageSize.width / imageSize.height;
+
+  let scale = 1, offsetX = 0, offsetY = 0;
+  if (imageRatio > containerRatio) {
+    scale = container.width / imageSize.width;
+    offsetY = (container.height - imageSize.height * scale) / 2;
+  } else {
+    scale = container.height / imageSize.height;
+    offsetX = (container.width - imageSize.width * scale) / 2;
+  }
+
+  const imgX = drawnRect.x - offsetX;
+  const imgY = drawnRect.y - offsetY;
+
+  const x_min = (imgX / scale) / imageSize.width;
+  const y_min = (imgY / scale) / imageSize.height;
+  const x_max = ((imgX + drawnRect.width) / scale) / imageSize.width;
+  const y_max = ((imgY + drawnRect.height) / scale) / imageSize.height;
   
-  const containerRect = editorImageContainer.value.getBoundingClientRect()
-  const item = itemsInEditor.value[activeDrawIndex.value]
-
-  const x_min = drawingRect.value.x / containerRect.width
-  const y_min = drawingRect.value.y / containerRect.height
-  const x_max = (drawingRect.value.x + drawingRect.value.width) / containerRect.width
-  const y_max = (drawingRect.value.y + drawingRect.value.height) / containerRect.height
-
-  item.bbox = [x_min, y_min, x_max, y_max]
-  activeDrawIndex.value = null
-  drawingRect.value = { x: 0, y: 0, width: 0, height: 0 }
+  return [
+      Math.max(0, Math.min(1, x_min)),
+      Math.max(0, Math.min(1, y_min)),
+      Math.max(0, Math.min(1, x_max)),
+      Math.max(0, Math.min(1, y_max))
+  ];
 }
 
-const getEditorBoxStyle = (bbox) => {
-  if (!bbox || !editorImageContainer.value) return {}
-  const containerRect = editorImageContainer.value.getBoundingClientRect()
-  const [x_min, y_min, x_max, y_max] = bbox
-  return {
-    position: 'absolute',
-    left: `${x_min * containerRect.width}px`,
-    top: `${y_min * containerRect.height}px`,
-    width: `${(x_max - x_min) * containerRect.width}px`,
-    height: `${(y_max - y_min) * containerRect.height}px`,
+// BBox 좌표 저장 로직 수정
+const handleMouseUp = () => {
+  if (!isDrawing.value || activeDrawIndex.value === null) return;
+  isDrawing.value = false;
+  
+  const item = itemsInEditor.value[activeDrawIndex.value];
+  
+  const normalized = normalizeBbox(drawingRect.value, editorImageContainer.value, originalImageSize.value);
+  if (normalized) {
+    item.bbox = normalized;
   }
+
+  activeDrawIndex.value = null;
+  drawingRect.value = { x: 0, y: 0, width: 0, height: 0 };
+};
+
+// 수정: 공통 함수를 사용하도록 변경
+const getEditorBoxStyle = (bbox) => {
+  return calculateBoxStyle(bbox, editorImageContainer.value, originalImageSize.value);
 }
 
 const saveChanges = async () => {
@@ -416,53 +484,66 @@ const handleNewValue = (inputValue, doneFn) => {
   }
 }
 
+const searchSelectRef = ref(null);
+
+const resolveItem = (item) => {
+  const query = item.name_ko;
+  if (!query) {
+    $q.notify({ message: '검색어를 입력해주세요.', color: 'warning' });
+    return;
+  }
+  
+  // Just confirm the name and hide the popup.
+  // The actual API call (including Gemini) will happen when the main "Save" button is clicked.
+  if (searchSelectRef.value) {
+    searchSelectRef.value.hidePopup();
+  }
+  $q.notify({
+    message: `'${query}'(으)로 확정되었습니다. 이제 위치를 지정해주세요.`,
+    color: 'info',
+    icon: 'edit_location'
+  });
+};
+
+const handleKeyup = (evt) => {
+  // When typing in Korean, the @filter event may not fire until the character is confirmed.
+  // This keyup handler forces the filter to run on each keystroke to provide a more 'live' search experience.
+  if (searchSelectRef.value && evt.target.value) {
+    searchSelectRef.value.filter(evt.target.value);
+  }
+};
+
+let debounceTimer;
 const filterFn = (val, update, abort) => {
+  clearTimeout(debounceTimer);
+
   if (val.length < 1) {
     abort();
     return;
   }
-  update(async () => {
-    try {
-      const response = await fetch(`http://localhost:5001/api/items/autocomplete?q=${val}`);
-      if (!response.ok) throw new Error('Network response was not ok');
-      const suggestions = await response.json();
-      autocompleteSuggestions.value = suggestions;
-    } catch (error) {
-      console.error('Error fetching autocomplete suggestions:', error);
-      autocompleteSuggestions.value = [];
-    }
-  });
+
+  debounceTimer = setTimeout(() => {
+    update(async () => {
+      try {
+        const response = await fetch(`http://localhost:5001/api/items/autocomplete?q=${val}`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        const suggestions = await response.json();
+        autocompleteSuggestions.value = suggestions;
+      } catch (error) {
+        console.error('Error fetching autocomplete suggestions:', error);
+        autocompleteSuggestions.value = [];
+      }
+    });
+  }, 300); // 300ms debounce
 }
 
+// 수정: 공통 함수를 사용하도록 변경
 const processResultsForDisplay = (results) => {
   setTimeout(() => {
-    if (!imageContainerRef.value) return;
-    const container = imageContainerRef.value.getBoundingClientRect();
-    const originalImageSize = JSON.parse(route.query.results || '{}').image_size || { width: 1, height: 1 };
-    const containerRatio = container.width / container.height;
-    const imageRatio = originalImageSize.width / originalImageSize.height;
-
-    let scale = 1, offsetX = 0, offsetY = 0;
-    if (imageRatio > containerRatio) {
-      scale = container.width / originalImageSize.width;
-      offsetY = (container.height - originalImageSize.height * scale) / 2;
-    } else {
-      scale = container.height / originalImageSize.height;
-      offsetX = (container.width - originalImageSize.width * scale) / 2;
-    }
-
     processedResults.value = results.map(item => {
-      if (!item.bbox) return { ...item, style: {} };
-      const [x_min, y_min, x_max, y_max] = item.bbox;
       return {
         ...item,
-        style: {
-          position: 'absolute',
-          left: `${(x_min * originalImageSize.width * scale) + offsetX}px`,
-          top: `${(y_min * originalImageSize.height * scale) + offsetY}px`,
-          width: `${((x_max - x_min) * originalImageSize.width) * scale}px`,
-          height: `${((y_max - y_min) * originalImageSize.height) * scale}px`,
-        }
+        style: calculateBoxStyle(item.bbox, imageContainerRef.value, originalImageSize.value)
       };
     });
   }, 100);
@@ -501,6 +582,8 @@ onMounted(() => {
       const resultData = JSON.parse(route.query.results);
       detectionResults.value = resultData.results || [];
       imageId.value = resultData.image_id;
+      // 수정: 원본 이미지 크기 저장
+      originalImageSize.value = resultData.image_size || { width: 1, height: 1 };
       processResultsForDisplay(detectionResults.value);
     } catch (e) {
       console.error("Error parsing results JSON:", e);

@@ -9,35 +9,23 @@ import io
 
 classify_bp = Blueprint("classify", __name__)
 
-def run_detection(img_bytes, conn, image_id):
+def run_detection(img_bytes, conn, image_id, img_width, img_height):
     """
     YOLO + SKU 탐지 후 DB 저장 및 결과 조합.
-    결과와 함께 이미지 너비, 높이를 반환합니다.
+    (수정됨: 이미지 크기를 인자로 받음)
     """
-    # 이미지 크기 가져오기
-    image = Image.open(io.BytesIO(img_bytes))
-    img_width, img_height = image.size
-
     bboxes = predict_bbox_with_sku(img_bytes)
-
-    # 테스트용 코드
-    #save_cropped_images(img_bytes, bboxes, image_id)
     yolo_predictions = predict_name_with_yolo(img_bytes, bboxes)
 
     enriched_results = []
 
     for p in yolo_predictions:
-        # 1️⃣ YOLO → DB 이름 매핑
         item_name_en = map_yolo_name(p["name"])
-
-        # 2️⃣ DB 조회
         db_info = fetch_item_info(item_name_en)
         item_name_ko = db_info["item_name"] if db_info else item_name_en
 
-        # 3️⃣ 탐지 결과 DB 저장 (원본 픽셀 좌표로 저장)
         insert_detected_item(conn, image_id, item_name_en, item_name_ko, p["bbox"])
 
-        # 4️⃣ 프론트엔드로 보낼 bbox 좌표 정규화 (0~1 사이 값으로)
         x_min, y_min, x_max, y_max = p["bbox"]
         normalized_bbox = [
             x_min / img_width,
@@ -46,18 +34,17 @@ def run_detection(img_bytes, conn, image_id):
             y_max / img_height
         ]
 
-        # 5️⃣ 결과 조합
         enriched_results.append({
             "name_ko": item_name_ko,
             "name_en": item_name_en,
-            "bbox": normalized_bbox, # 정규화된 좌표 사용
+            "bbox": normalized_bbox,
             "confidence": p["confidence"],
             "carry_on_allowed": db_info["carry_on_allowed"] if db_info else None,
             "checked_baggage_allowed": db_info["checked_baggage_allowed"] if db_info else None,
             "notes": db_info["notes"] if db_info else "DB에 규정 정보 없음"
         })
 
-    return enriched_results, img_width, img_height
+    return enriched_results
 
 
 @classify_bp.route("/classify", methods=["POST"])
@@ -68,17 +55,24 @@ def classify():
     file = request.files["image"]
     img_bytes = file.read()
 
+    # (수정됨) 이미지 크기를 먼저 가져옵니다.
+    try:
+        image = Image.open(io.BytesIO(img_bytes))
+        img_width, img_height = image.size
+    except Exception as e:
+        return jsonify({"error": f"Invalid image file: {e}"}), 400
+
     engine = get_engine()
     if not engine:
         return jsonify({"error": "Database connection failed"}), 500
 
     try:
         with engine.begin() as conn:
-            # --- 이미지 저장 ---
-            image_id = insert_image(conn, user_id="custom1", image_bytes=img_bytes)
+            # (수정됨) 이미지 저장 시 크기 정보 전달
+            image_id = insert_image(conn, user_id="custom1", image_bytes=img_bytes, width=img_width, height=img_height)
 
-            # --- 탐지 + DB 저장 + 결과 조합 ---
-            results, img_width, img_height = run_detection(img_bytes, conn, image_id)
+            # (수정됨) 탐지 함수에 크기 정보 전달
+            results = run_detection(img_bytes, conn, image_id, img_width, img_height)
 
             return jsonify({
                 "message": "Detection and classification complete.",

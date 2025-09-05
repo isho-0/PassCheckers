@@ -5,7 +5,7 @@ load_dotenv() # .env 파일에서 환경 변수를 로드
 class Config:
     # 데이터베이스 설정
     # create_engine(f"mysql+pymysql://{user}:{password}@{host}/{database}?charset=utf8mb4")
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:1207@localhost/project?charset=utf8mb4'
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:5429@localhost/project?charset=utf8mb4'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # CORS 설정: 프론트엔드 요청을 허용할 주소 목록

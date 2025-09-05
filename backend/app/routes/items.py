@@ -62,14 +62,12 @@ def add_detected_items():
             item_name_ko = item_data['name_ko']
             item_details = ItemModel.get_by_name(item_name_ko)
 
-            # DB에 정확히 일치하는 물품이 없는 경우, 유사한 물품을 찾아봅니다.
             if not item_details:
                 best_match_result = item_service.find_best_match(item_name_ko)
-                if best_match_result and best_match_result['score'] >= 90: # 90점 이상이면 유사한 물품으로 간주
+                if best_match_result and best_match_result['score'] >= 90:
                     print(f"[ADD API] Found similar item '{best_match_result['name']}' for '{item_name_ko}'. Using it.")
                     item_details = ItemModel.get_by_name(best_match_result['name'])
 
-            # 유사한 물품도 없고, DB에 없는 물품인 경우 Gemini API 호출
             if not item_details:
                 print(f"[ADD API] Item '{item_name_ko}' not found in DB and no high-score match. Calling Gemini...")
                 gemini_data = gemini_service.get_item_info_from_gemini(item_name_ko)
@@ -79,9 +77,8 @@ def add_detected_items():
                     item_details = ItemModel.add_item_from_api(gemini_data)
                 else:
                     print(f"[ADD API] Gemini could not provide data for '{item_name_ko}'. Skipping.")
-                    continue # Gemini도 정보를 주지 못하면 해당 아이템은 건너뜀
+                    continue
 
-            # packing_info 결정
             packing_info = 'none'
             if item_details.carry_on_allowed == '예' and item_details.checked_baggage_allowed == '예':
                 packing_info = 'both'
@@ -98,7 +95,6 @@ def add_detected_items():
                 packing_info=packing_info
             )
 
-        # 변경 후, 해당 이미지의 전체 아이템 목록을 다시 조회하여 반환
         all_detected_items = DetectedItemModel.get_by_image_id(image_id)
         return jsonify([item.to_dict() for item in all_detected_items]), 201
 
@@ -122,9 +118,9 @@ def delete_detected_items():
         if item_ids_to_delete:
             DetectedItemModel.delete_items(item_ids_to_delete)
         
-        # 삭제 작업 후, 최신 아이템 목록 전체를 다시 조회하여 반환
         all_detected_items = DetectedItemModel.get_by_image_id(image_id)
         return jsonify([item.to_dict() for item in all_detected_items]), 200
 
     except Exception as e:
         return jsonify({"error": "서버 내부 오류가 발생했습니다."}), 500
+

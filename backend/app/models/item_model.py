@@ -71,3 +71,21 @@ class ItemModel(db.Model):
         db.session.add(new_item)
         db.session.commit()
         return new_item
+
+    def to_dict(self):
+        """Converts this model instance to a dictionary."""
+        return {
+            'id': self.id,
+            'item_name': self.item_name,
+            'item_name_EN': self.item_name_EN,
+            'carry_on_allowed': self.carry_on_allowed,
+            'checked_baggage_allowed': self.checked_baggage_allowed,
+            'notes': self.notes,
+            'notes_EN': self.notes_EN,
+            'source': self.source
+        }
+
+    @classmethod
+    def get_by_id(cls, item_id):
+        """ID로 특정 아이템의 상세 정보를 조회합니다."""
+        return cls.query.get(item_id)

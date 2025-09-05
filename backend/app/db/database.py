@@ -73,18 +73,20 @@ def fetch_item_info(item_name_en: str):
 
 
 # --- 이미지 저장 ---
-def insert_image(conn, user_id: str, image_bytes: bytes):
+def insert_image(conn, user_id: str, image_bytes: bytes, width: int, height: int):
     """
-    이미지 데이터를 DB에 저장하고 image_id 반환.
+    이미지 데이터와 크기를 DB에 저장하고 image_id 반환.
     """
     image_query = text("""
-        INSERT INTO images (user_id, image_data, created_at)
-        VALUES (:user_id, :image_data, :created_at)
+        INSERT INTO images (user_id, image_data, created_at, width, height)
+        VALUES (:user_id, :image_data, :created_at, :width, :height)
     """)
     result = conn.execute(image_query, {
         "user_id": user_id,
         "image_data": image_bytes,
-        "created_at": datetime.now()
+        "created_at": datetime.now(),
+        "width": width,
+        "height": height
     })
     return result.lastrowid
 
@@ -108,3 +110,29 @@ def insert_detected_item(conn, image_id: int, item_name_en: str, item_name: str,
         "bbox_x_max": bbox[2],
         "bbox_y_max": bbox[3]
     })
+
+
+def get_image_details_by_id(image_id: int):
+    """
+    ID로 이미지 데이터와 크기를 DB에서 조회합니다.
+    """
+    engine = get_engine()
+    if not engine:
+        return None
+
+    try:
+        query = text("""
+            SELECT image_data, width, height
+            FROM images
+            WHERE id = :image_id
+            LIMIT 1
+        """)
+        with engine.connect() as conn:
+            result = conn.execute(query, {"image_id": image_id}).mappings().fetchone()
+            if result:
+                return dict(result)
+            else:
+                return None
+    except Exception as e:
+        print(f"[DB QUERY ERROR] {e}")
+        return None
