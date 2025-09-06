@@ -95,8 +95,9 @@ def add_detected_items():
                 packing_info=packing_info
             )
 
-        all_detected_items = DetectedItemModel.get_by_image_id(image_id)
-        return jsonify([item.to_dict() for item in all_detected_items]), 201
+        # 모든 작업 후, 상세 정보가 포함된 최신 목록을 가져옵니다.
+        all_detected_items = DetectedItemModel.get_detailed_by_image_id(image_id)
+        return jsonify(all_detected_items), 201
 
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -118,9 +119,25 @@ def delete_detected_items():
         if item_ids_to_delete:
             DetectedItemModel.delete_items(item_ids_to_delete)
         
-        all_detected_items = DetectedItemModel.get_by_image_id(image_id)
-        return jsonify([item.to_dict() for item in all_detected_items]), 200
+        # 삭제 작업 후, 상세 정보가 포함된 최신 목록을 가져옵니다.
+        all_detected_items = DetectedItemModel.get_detailed_by_image_id(image_id)
+        return jsonify(all_detected_items), 200
 
     except Exception as e:
         return jsonify({"error": "서버 내부 오류가 발생했습니다."}), 500
+
+@items_bp.route('/results/<int:image_id>', methods=['GET'])
+def get_results_by_image_id(image_id):
+    """특정 이미지 ID에 대한 모든 상세 탐지 결과를 반환합니다."""
+    try:
+        detailed_items = DetectedItemModel.get_detailed_by_image_id(image_id)
+        if detailed_items is None:
+            # get_detailed_by_image_id가 None을 반환하는 경우 (예: 해당 이미지 ID 없음)
+            return jsonify({"error": "해당 이미지 ID에 대한 결과를 찾을 수 없습니다."}), 404
+        return jsonify(detailed_items), 200
+    except Exception as e:
+        print(f"[RESULTS API] Server error: {e}")
+        return jsonify({"error": "서버 내부 오류가 발생했습니다."}), 500
+
+
 

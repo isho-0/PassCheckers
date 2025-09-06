@@ -63,7 +63,7 @@ def get_item_info_from_gemini(item_name: str):
             "carry_on_allowed": parts[1].strip(),
             "checked_baggage_allowed": parts[2].strip(),
             "notes": notes_ko,
-            "item_name_EN": parts[4].strip(),
+            "item_name_EN": parts[4].strip().strip('"'),
             "notes_EN": notes_en,
             "source": parts[6].strip()
         }

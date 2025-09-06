@@ -1,4 +1,5 @@
 from app.db.database import db
+from app.models.item_model import ItemModel
 
 class DetectedItemModel(db.Model):
     """
@@ -42,7 +43,7 @@ class DetectedItemModel(db.Model):
         return {
             'item_id': self.item_id,
             'image_id': self.image_id,
-            'item_name': self.item_name,
+            'name_ko': self.item_name, # 프론트엔드와 일치시키기 위해 'item_name' -> 'name_ko'로 변경
             'item_name_EN': self.item_name_EN,
             'bbox': [self.bbox_x_min, self.bbox_y_min, self.bbox_x_max, self.bbox_y_max],
             'packing_info': self.packing_info
@@ -58,7 +59,7 @@ class DetectedItemModel(db.Model):
             return 0
         
         try:
-            num_deleted = cls.query.filter(cls.item_id.in_(item_ids)).delete(synchronize_session=False)
+            num_deleted = cls.query.filter(cls.item_id.in_(item_ids)).delete(synchronize_session='fetch')
             db.session.commit()
             return num_deleted
         except Exception as e:
@@ -69,3 +70,44 @@ class DetectedItemModel(db.Model):
     def get_by_image_id(cls, image_id):
         """특정 이미지 ID에 해당하는 모든 탐지 아이템을 조회합니다."""
         return cls.query.filter_by(image_id=image_id).all()
+
+    @classmethod
+    def get_detailed_by_image_id(cls, image_id):
+        """ 특정 이미지 ID에 대해 탐지된 아이템과 규정 정보를 조인하여 상세 정보를 반환합니다. """
+        results = db.session.query(
+            cls, ItemModel
+        ).outerjoin(
+            ItemModel, cls.item_name == ItemModel.item_name
+        ).filter(cls.image_id == image_id).all()
+
+        detailed_items = []
+        for detected_item, item_details in results:
+            if item_details:
+                # 규정 정보가 있는 경우
+                item_dict = {
+                    'item_id': detected_item.item_id,
+                    'image_id': detected_item.image_id,
+                    'name_ko': detected_item.item_name,
+                    'item_name_EN': item_details.item_name_EN,
+                    'bbox': [detected_item.bbox_x_min, detected_item.bbox_y_min, detected_item.bbox_x_max, detected_item.bbox_y_max],
+                    'packing_info': detected_item.packing_info,
+                    'carry_on_allowed': item_details.carry_on_allowed,
+                    'checked_baggage_allowed': item_details.checked_baggage_allowed,
+                    'notes': item_details.notes
+                }
+            else:
+                # 규정 정보가 없는 경우 (items 테이블에 매칭되는 이름이 없음)
+                item_dict = {
+                    'item_id': detected_item.item_id,
+                    'image_id': detected_item.image_id,
+                    'name_ko': detected_item.item_name,
+                    'item_name_EN': detected_item.item_name_EN, # 탐지된 정보라도 사용
+                    'bbox': [detected_item.bbox_x_min, detected_item.bbox_y_min, detected_item.bbox_x_max, detected_item.bbox_y_max],
+                    'packing_info': detected_item.packing_info,
+                    'carry_on_allowed': '확인 불가',
+                    'checked_baggage_allowed': '확인 불가',
+                    'notes': '규정 정보를 찾을 수 없습니다.'
+                }
+            detailed_items.append(item_dict)
+        
+        return detailed_items

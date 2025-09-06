@@ -20,7 +20,12 @@
           </div>
           <q-card flat bordered class="image-card">
             <div ref="imageContainerRef" class="image-container">
-              <q-img :src="imageUrl" style="border-radius: 16px; max-height: 400px;" fit="contain">
+              <q-img 
+                :src="imageUrl" 
+                style="border-radius: 16px; max-height: 400px;" 
+                fit="contain"
+                @load="isImageLoaded = true"
+              >
                 <template v-slot:error>
                   <div class="absolute-full flex flex-center bg-negative text-white">
                     이미지를 불러올 수 없습니다
@@ -29,14 +34,16 @@
               </q-img>
 
               <!-- Bounding Box 표시 시작 -->
-              <div
-                v-for="(item, index) in processedResults"
-                :key="`box-${index}`"
-                :class="['bounding-box', { 'bounding-box--hovered': hoveredIndex === index }]"
-                :style="item.style"
-              >
-                <div class="box-label">{{ item.name_ko }}</div>
-              </div>
+              <template v-if="isImageLoaded">
+                <div
+                  v-for="(item, index) in detectionResults"
+                  :key="item.item_id || item.name_ko"
+                  :class="['bounding-box', { 'bounding-box--hovered': hoveredIndex === index }]"
+                  :style="calculateBoxStyle(item.bbox, imageContainerRef, originalImageSize)"
+                >
+                  <div class="box-label">{{ item.name_ko }}</div>
+                </div>
+              </template>
               <!-- Bounding Box 표시 끝 -->
 
             </div>
@@ -64,29 +71,55 @@
               </q-card-section>
               <q-separator />
               <q-list separator class="col">
-                <q-item 
-                  v-for="(item, index) in detectionResults" 
-                  :key="index"
-                  @mouseenter="hoveredIndex = index"
-                  @mouseleave="hoveredIndex = null"
-                  clickable
-                >
-                  <q-item-section avatar>
-                    <q-icon :name="getIconFor(item.name_ko)" color="primary" />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label class="text-weight-medium">{{ item.name_ko }}</q-item-label>
-                    <q-item-label caption v-if="item.confidence">정확도: {{ (item.confidence * 100).toFixed(0) }}%</q-item-label>
-                  </q-item-section>
-                  <q-item-section side>
-                    <q-badge :color="getCarryOnColor(item.carry_on_allowed)" outline>
-                      기내: {{ item.carry_on_allowed || '확인 불가' }}
-                    </q-badge>
-                    <q-badge :color="getCheckedColor(item.checked_baggage_allowed)" outline class="q-mt-xs">
-                      위탁: {{ item.checked_baggage_allowed || '확인 불가' }}
-                    </q-badge>
-                  </q-item-section>
-                </q-item>
+                <div v-for="(item, index) in detectionResults" :key="item.item_id || item.name_ko">
+                  <q-item 
+                    @mouseenter="hoveredIndex = index"
+                    @mouseleave="hoveredIndex = null"
+                    clickable
+                    @click="toggleAccordion(index)"
+                  >
+                    <q-item-section avatar>
+                      <q-icon :name="getIconFor(item.name_ko)" color="primary" />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label class="text-weight-medium">{{ item.name_ko }}</q-item-label>
+                      <q-item-label caption v-if="item.confidence">정확도: {{ (item.confidence * 100).toFixed(0) }}%</q-item-label>
+                    </q-item-section>
+                    <q-item-section side>
+                      <div class="row items-center no-wrap">
+                        <div class="column items-end">
+                          <q-badge :color="getSpecialCarryOnColor(item.carry_on_allowed)" class="q-mb-xs status-badge-simple">
+                            기내
+                          </q-badge>
+                          <q-badge :color="getCheckedColor(item.checked_baggage_allowed)" class="status-badge-simple">
+                            위탁
+                          </q-badge>
+                        </div>
+                        <q-icon class="q-ml-sm" :name="expandedIndex === index ? 'expand_less' : 'expand_more'" />
+                      </div>
+                    </q-item-section>
+                  </q-item>
+                  <q-slide-transition>
+                    <div v-show="expandedIndex === index">
+                      <q-separator />
+                      <div class="details-section q-pa-md">
+                        <div class="row items-center q-mb-sm">
+                          <div class="text-weight-bold q-mr-md">기내 반입:</div>
+                          <q-badge :color="getSpecialCarryOnColor(item.carry_on_allowed)" class="status-badge-large">
+                            {{ item.carry_on_allowed || '확인 불가' }}
+                          </q-badge>
+                        </div>
+                        <div class="row items-center q-mb-md">
+                          <div class="text-weight-bold q-mr-md">위탁 수하물:</div>
+                          <q-badge :color="getCheckedColor(item.checked_baggage_allowed)" class="status-badge-large">
+                            {{ item.checked_baggage_allowed || '확인 불가' }}
+                          </q-badge>
+                        </div>
+                        <div class="text-caption text-grey-8">{{ item.notes || '상세한 규정 내용이 없습니다.' }}</div>
+                      </div>
+                    </div>
+                  </q-slide-transition>
+                </div>
               </q-list>
             </div>
           </q-card>
@@ -119,7 +152,7 @@
                   <!-- 이미 추가된 BBox들 -->
                   <div 
                     v-for="(item, index) in itemsInEditor.filter(i => i.bbox && !i.isDeleted)"
-                    :key="`edit-box-${index}`"
+                    :key="`edit-box-${item.item_id || index}`"
                     class="drawn-box"
                     :style="getEditorBoxStyle(item.bbox)"
                     :class="{ 'drawn-box--hovered': editorHoveredIndex === index }"
@@ -143,25 +176,28 @@
                 <q-item 
                   v-for="(item, index) in itemsInEditor" 
                   :key="item.item_id || `new-${index}`" 
-                  :class="{ 'bg-grey-3': item.isDeleted }"
+                  :class="{ 'bg-grey-3': item.isDeleted, 'item-confirmed': item.isConfirmed }"
                   @mouseenter="editorHoveredIndex = index"
                   @mouseleave="editorHoveredIndex = null"
                 >
                   <q-item-section>
                     <q-select
-                      ref="searchSelectRef"
-                      v-if="item.isNew"
+                      :ref="(el) => { if (el) searchSelectRefs[index] = el }"
+                      v-if="item.isNew && !item.isConfirmed"
                       v-model="item.name_ko"
-                      label="객체명을 검색하세요"
+                      label="물품명 입력 후 Enter로 검색"
                       autofocus
                       dense
                       use-input
                       fill-input
                       hide-selected
                       :options="autocompleteSuggestions"
-                      @filter="filterFn"
-                      @keyup="handleKeyup"
-                      :disable="item.isDeleted"
+                      @new-value="handleNewValue"
+                      new-value-mode="add-unique"
+                      @keyup.enter="handleEnterKey($event, index)"
+                      @blur="onSelectBlur($event, item)"
+                      @input-value="(val) => item.name_ko = val"
+                      autocomplete="off"
                     >
                       <template v-slot:no-option>
                         <q-item>
@@ -170,44 +206,46 @@
                           </q-item-section>
                         </q-item>
                       </template>
-                      <template v-slot:append>
-                        <q-btn
-                          round
-                          dense
-                          flat
-                          icon="check"
-                          @click="resolveItem(item)"
-                          :disable="!item.name_ko"
-                        >
-                          <q-tooltip>항목 확정</q-tooltip>
-                        </q-btn>
-                      </template>
                     </q-select>
-                    <q-item-label v-else :class="{ 'text-grey-6': item.isDeleted, 'text-strike': item.isDeleted }">{{ item.name_ko }}</q-item-label>
+
+                    <div v-if="item.isNew && item.isConfirmed" class="confirmed-item row items-center no-wrap">
+                      <q-item-label class="col">{{ item.name_ko }}</q-item-label>
+                      <q-btn round dense flat icon="edit" @click="item.isConfirmed = false" class="q-ml-sm">
+                        <q-tooltip>이름 수정</q-tooltip>
+                      </q-btn>
+                    </div>
+
+                    <q-item-label v-else-if="!item.isNew" :class="{ 'text-grey-6': item.isDeleted, 'text-strike': item.isDeleted }">{{ item.name_ko }}</q-item-label>
                   </q-item-section>
+
                   <q-item-section side>
-                    <q-btn 
-                      v-if="item.isNew && item.name_ko"
-                      icon="edit_location"
-                      flat
-                      round
-                      dense
-                      @click="activateDrawing(index)"
-                      :color="activeDrawIndex === index ? 'primary' : 'grey'"
-                      :disable="item.isDeleted"
-                    >
-                      <q-tooltip>위치 지정</q-tooltip>
-                    </q-btn>
-                    <q-btn
-                      :icon="item.isDeleted ? 'undo' : 'delete'"
-                      :flat="!item.isDeleted"
-                      :color="item.isDeleted ? 'grey-5' : ''"
-                      round
-                      dense
-                      @click="toggleDeleteItem(item)"
-                    >
-                      <q-tooltip>{{ item.isDeleted ? '복구' : '삭제' }}</q-tooltip>
-                    </q-btn>
+                    <div class="row no-wrap items-center">
+                      <q-btn
+                        v-if="item.isNew && !item.isConfirmed"
+                        round dense flat icon="check"
+                        @click="resolveItem(item)"
+                        :disable="!item.name_ko"
+                      >
+                        <q-tooltip>항목 확정</q-tooltip>
+                      </q-btn>
+                      <q-btn 
+                        v-if="item.isNew && item.isConfirmed"
+                        :icon="item.bbox ? 'replay' : 'edit_location'"
+                        flat round dense
+                        @click="activateDrawing(index)"
+                        :color="item.bbox ? 'positive' : (activeDrawIndex === index ? 'primary' : 'grey')"
+                        :disable="item.isDeleted"
+                      >
+                        <q-tooltip>{{ item.bbox ? '위치 다시 지정' : '위치 지정' }}</q-tooltip>
+                      </q-btn>
+                      <q-btn
+                        :icon="item.isDeleted ? 'undo' : 'delete'"
+                        flat round dense
+                        @click="toggleDeleteItem(item)"
+                      >
+                        <q-tooltip>{{ item.isDeleted ? '복구' : '삭제' }}</q-tooltip>
+                      </q-btn>
+                    </div>
                   </q-item-section>
                 </q-item>
               </q-list>
@@ -227,7 +265,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick, onBeforeUpdate } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 
@@ -239,10 +277,11 @@ const isSaving = ref(false)
 const imageUrl = ref('')
 const imageId = ref(null)
 const detectionResults = ref([])
-const processedResults = ref([])
 const imageContainerRef = ref(null)
 const hoveredIndex = ref(null)
-const originalImageSize = ref({ width: 1, height: 1 }); // 원본 이미지 크기 저장
+const originalImageSize = ref({ width: 1, height: 1 });
+const expandedIndex = ref(null); // For accordion
+const isImageLoaded = ref(false);
 
 // --- Editor Modal State ---
 const showEditModal = ref(false)
@@ -250,6 +289,7 @@ const itemsInEditor = ref([])
 const autocompleteSuggestions = ref([])
 const editorImageContainer = ref(null)
 const editorHoveredIndex = ref(null)
+const searchSelectRefs = ref([]);
 
 // --- BBox Drawing State ---
 const isDrawing = ref(false)
@@ -298,8 +338,8 @@ const openEditModal = () => {
 }
 
 const addNewItem = () => {
-  if (itemsInEditor.value.some(item => item.isNew)) return
-  itemsInEditor.value.unshift({ isNew: true, name_ko: '', bbox: null, isDeleted: false })
+  if (itemsInEditor.value.some(item => item.isNew && !item.isConfirmed)) return;
+  itemsInEditor.value.unshift({ isNew: true, name_ko: '', bbox: null, isDeleted: false, isConfirmed: false });
 }
 
 const toggleDeleteItem = (item) => {
@@ -394,177 +434,159 @@ const getEditorBoxStyle = (bbox) => {
 }
 
 const saveChanges = async () => {
-    if (isSaving.value) return; // 중복 실행 방지
+    if (isSaving.value) return;
 
     isSaving.value = true;
     try {
-      const itemsToAdd = itemsInEditor.value.filter(item => item.isNew && !item.isDeleted &&
-  item.name_ko && item.bbox);
-      const itemsToDelete = itemsInEditor.value.filter(item => !item.isNew && item.isDeleted);
+        const itemsToAdd = itemsInEditor.value.filter(item => item.isNew && item.isConfirmed && !item.isDeleted && item.name_ko && item.bbox);
+        const itemsToDelete = itemsInEditor.value.filter(item => !item.isNew && item.isDeleted);
 
-      if (itemsToAdd.length === 0 && itemsToDelete.length === 0) {
-        $q.notify({ message: '변경 사항이 없습니다.', color: 'info' });
-        return;
-      }
-
-      const promises = [];
-      let lastResponseData = null; // 마지막 성공 응답의 데이터를 저장할 변수
-
-      // 삭제 API 호출
-      if (itemsToDelete.length > 0) {
-        const deletePayload = {
-          image_id: imageId.value,
-          item_ids: itemsToDelete.map(item => item.item_id)
-        };
-        promises.push(fetch('http://localhost:5001/api/items/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(deletePayload)
-        }));
-      }
-
-      // 추가 API 호출
-      if (itemsToAdd.length > 0) {
-        const addPayload = {
-          image_id: imageId.value,
-          new_items: itemsToAdd.map(item => ({ name_ko: item.name_ko, bbox: item.bbox }))
-        };
-        promises.push(fetch('http://localhost:5001/api/items/add', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(addPayload)
-        }));
-      }
-
-      const responses = await Promise.all(promises);
-
-      // 모든 응답이 정상적인지 확인
-      for (const response of responses) {
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || '저장 중 오류가 발생했습니다.');
+        if (itemsToAdd.length === 0 && itemsToDelete.length === 0) {
+            $q.notify({ message: '변경 사항이 없습니다.', color: 'info' });
+            return;
         }
-        // 응답이 JSON 형식인지 확인 후 파싱
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            lastResponseData = await response.json();
-        } else {
-            // JSON이 아니면 응답 본문을 소비하여 다음 요청에 영향을 주지 않도록 함
-            await response.text();
+
+        let currentResults = [...detectionResults.value];
+
+        // 1. 삭제 API 순차적 호출
+        if (itemsToDelete.length > 0) {
+            const deletePayload = {
+                image_id: imageId.value,
+                item_ids: itemsToDelete.map(item => item.item_id)
+            };
+            const response = await fetch('http://localhost:5001/api/items/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(deletePayload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || '삭제 중 오류가 발생했습니다.');
+            }
+            currentResults = await response.json();
         }
-      }
 
-      // 마지막 성공 응답 데이터로 UI 업데이트
-      if (lastResponseData) {
-        detectionResults.value = lastResponseData;
-        processResultsForDisplay(lastResponseData);
-      } else {
-          // JSON 응답이 없었다면 (예: 삭제만 발생), itemsInEditor를 필터링하여 UI 업데이트
-          detectionResults.value = itemsInEditor.value.filter(item => !item.isDeleted);
-          processResultsForDisplay(detectionResults.value);
-      }
+        // 2. 추가 API 순차적 호출
+        if (itemsToAdd.length > 0) {
+            const addPayload = {
+                image_id: imageId.value,
+                new_items: itemsToAdd.map(item => ({ name_ko: item.name_ko, bbox: item.bbox }))
+            };
+            const response = await fetch('http://localhost:5001/api/items/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(addPayload)
+            });
 
-      $q.notify({ message: '성공적으로 저장되었습니다.', color: 'positive', icon: 'check' });
-      showEditModal.value = false; // 팝업 닫기
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || '추가 중 오류가 발생했습니다.');
+            }
+            currentResults = await response.json();
+        }
+
+        // 3. 최종 결과로 UI 업데이트
+        detectionResults.value = currentResults;
+
+        $q.notify({ message: '성공적으로 저장되었습니다.', color: 'positive', icon: 'check' });
 
     } catch (error) {
-      console.error('Error saving changes:', error);
-      $q.notify({ message: `오류 발생: ${error.message}`, color: 'negative' });
+        console.error('Error saving changes:', error);
+        $q.notify({ message: `오류 발생: ${error.message}`, color: 'negative' });
     } finally {
-      isSaving.value = false;
+        isSaving.value = false;
+        showEditModal.value = false;
     }
-  };
+};
 
 const handleNewValue = (inputValue, doneFn) => {
   if (inputValue.length > 0) {
-    if (!autocompleteSuggestions.value.includes(inputValue)) {
-      autocompleteSuggestions.value.unshift(inputValue);
+    if (!autocompleteSuggestions.value.some(s => s.toLowerCase() === inputValue.toLowerCase())) {
+      doneFn(inputValue, 'add-unique');
     }
-    doneFn(inputValue, 'toggle');
   }
 }
 
-const searchSelectRef = ref(null);
+const onSelectBlur = (evt, item) => {
+  if (evt.target && evt.target.value === '') {
+    item.name_ko = '';
+  }
+};
 
 const resolveItem = (item) => {
-  const query = item.name_ko;
-  if (!query) {
-    $q.notify({ message: '검색어를 입력해주세요.', color: 'warning' });
+  if (!item || !item.name_ko) {
+    $q.notify({ message: '물품명을 입력하거나 선택해주세요.', color: 'warning' });
     return;
   }
   
-  // Just confirm the name and hide the popup.
-  // The actual API call (including Gemini) will happen when the main "Save" button is clicked.
-  if (searchSelectRef.value) {
-    searchSelectRef.value.hidePopup();
-  }
+  item.isConfirmed = true;
+  
   $q.notify({
-    message: `'${query}'(으)로 확정되었습니다. 이제 위치를 지정해주세요.`,
+    message: `'${item.name_ko}'(으)로 확정되었습니다. 이제 위치를 지정해주세요.`,
     color: 'info',
-    icon: 'edit_location'
+    icon: 'edit_location',
+    timeout: 2000
   });
 };
 
-const handleKeyup = (evt) => {
-  // When typing in Korean, the @filter event may not fire until the character is confirmed.
-  // This keyup handler forces the filter to run on each keystroke to provide a more 'live' search experience.
-  if (searchSelectRef.value && evt.target.value) {
-    searchSelectRef.value.filter(evt.target.value);
+const handleEnterKey = async (event, index) => {
+  const selectComponent = searchSelectRefs.value[index];
+  const currentInputValue = event.target.value;
+
+  if (selectComponent && currentInputValue) {
+    try {
+      const response = await fetch(`http://localhost:5001/api/items/autocomplete?q=${currentInputValue}`);
+      if (!response.ok) throw new Error('Network response was not ok');
+      
+      const suggestions = await response.json();
+      autocompleteSuggestions.value = suggestions;
+      
+      selectComponent.showPopup();
+
+    } catch (error) {
+      console.error('Error fetching autocomplete suggestions on enter:', error);
+      autocompleteSuggestions.value = [];
+      selectComponent.showPopup();
+    }
   }
 };
 
-let debounceTimer;
-const filterFn = (val, update, abort) => {
-  clearTimeout(debounceTimer);
+const onImageLoad = () => {
+  isImageLoaded.value = true;
+}
 
-  if (val.length < 1) {
-    abort();
-    return;
+const findDetectionResultIndex = (item) => {
+  return detectionResults.value.findIndex(dr => dr.item_id === item.item_id);
+};
+
+const toggleAccordion = (index) => {
+  if (expandedIndex.value === index) {
+    expandedIndex.value = null;
+  } else {
+    expandedIndex.value = index;
   }
-
-  debounceTimer = setTimeout(() => {
-    update(async () => {
-      try {
-        const response = await fetch(`http://localhost:5001/api/items/autocomplete?q=${val}`);
-        if (!response.ok) throw new Error('Network response was not ok');
-        const suggestions = await response.json();
-        autocompleteSuggestions.value = suggestions;
-      } catch (error) {
-        console.error('Error fetching autocomplete suggestions:', error);
-        autocompleteSuggestions.value = [];
-      }
-    });
-  }, 300); // 300ms debounce
-}
-
-// 수정: 공통 함수를 사용하도록 변경
-const processResultsForDisplay = (results) => {
-  setTimeout(() => {
-    processedResults.value = results.map(item => {
-      return {
-        ...item,
-        style: calculateBoxStyle(item.bbox, imageContainerRef.value, originalImageSize.value)
-      };
-    });
-  }, 100);
-}
+};
 
 const getIconFor = (itemName) => {
+  if (!itemName) return 'check_box_outline_blank';
   if (itemName.includes('노트북')) return 'laptop_chromebook';
   if (itemName.includes('배터리')) return 'battery_charging_full';
   if (itemName.includes('가위')) return 'content_cut';
   return 'check_box_outline_blank';
 }
 
-const getCarryOnColor = (status) => {
-  if (status === '가능') return 'positive';
-  if (status === '불가') return 'negative';
+const getSpecialCarryOnColor = (status) => {
+  if (!status) return 'grey';
+  if (status.includes('특별') || status.includes('100 ml')) return 'amber';
+  if (status === '예') return 'positive';
+  if (status === '아니요') return 'negative';
   return 'grey';
-}
+};
 
 const getCheckedColor = (status) => {
-  if (status === '가능') return 'positive';
-  if (status === '불가') return 'negative';
+  if (status === '예') return 'positive';
+  if (status === '아니요') return 'negative';
   return 'grey';
 }
 
@@ -572,9 +594,14 @@ let resizeTimeout;
 const handleResize = () => {
   clearTimeout(resizeTimeout);
   resizeTimeout = setTimeout(() => {
-    processResultsForDisplay(detectionResults.value);
+    // Re-calculate BBoxes on resize
+    // This is a placeholder for a potential future improvement if needed
   }, 150);
 }
+
+onBeforeUpdate(() => {
+  searchSelectRefs.value = [];
+});
 
 onMounted(() => {
   if (route.query.results) {
@@ -582,9 +609,7 @@ onMounted(() => {
       const resultData = JSON.parse(route.query.results);
       detectionResults.value = resultData.results || [];
       imageId.value = resultData.image_id;
-      // 수정: 원본 이미지 크기 저장
       originalImageSize.value = resultData.image_size || { width: 1, height: 1 };
-      processResultsForDisplay(detectionResults.value);
     } catch (e) {
       console.error("Error parsing results JSON:", e);
       detectionResults.value = [];
@@ -616,4 +641,30 @@ onUnmounted(() => {
 .bounding-box--hovered .box-label { background-color: #ff6f00; }
 .text-strike { text-decoration: line-through; }
 .drawn-box--hovered { border-color: #ff6f00 !important; }
+.item-confirmed {
+  background-color: #f5f5f5; 
+}
+.confirmed-item {
+  font-style: italic;
+  color: #555;
+}
+.details-section {
+  background-color: #f8f9fa;
+  border-top: 1px solid #eee;
+}
+.status-badge-large {
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 8px;
+  color: white;
+}
+.status-badge-simple {
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: white;
+  font-size: 0.7rem;
+  width: 35px;
+  text-align: center;
+}
 </style>
