@@ -1,5 +1,7 @@
 {
-  "name": "nuxt-app",
+  "name": "passcheckers-frontend",
+  "version": "1.0.0",
+  "description": "PassCheckers Frontend - AI 기반 수하물 분류 웹 애플리케이션",
   "private": true,
   "type": "module",
   "scripts": {
