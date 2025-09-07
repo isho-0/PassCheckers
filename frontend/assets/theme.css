@@ -1,0 +1,197 @@
+:root {
+  --main-bg: #f6fbff;
+  --main-blue: #2196f3;
+  --main-card: #fff;
+  --main-radius: 16px;
+  --main-shadow: 0 2px 8px rgba(33,150,243,0.08);
+  --main-font: 'Pretendard', 'Noto Sans KR', sans-serif;
+}
+body {
+  background: linear-gradient(180deg, #f6fbff 0%, #e3f0fa 100%);
+  font-family: var(--main-font);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+.q-card {
+  border-radius: var(--main-radius);
+  box-shadow: var(--main-shadow);
+  background: var(--main-card);
+}
+.q-btn {
+  font-weight: 600;
+}
+
+.page-section {
+  background: var(--main-card);
+  border-radius: var(--main-radius);
+  box-shadow: var(--main-shadow);
+  padding: 40px 32px;
+  margin: 0 auto 32px auto;
+  max-width: 700px;
+  min-height: 200px;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--main-blue);
+  margin-bottom: 12px;
+}
+
+.page-desc {
+  color: #888;
+  font-size: 1.1rem;
+  margin-bottom: 24px;
+}
+
+.q-card[clickable] {
+  transition: box-shadow 0.2s, transform 0.15s, background 0.2s;
+}
+.q-card[clickable]:hover {
+  box-shadow: 0 6px 24px rgba(33,150,243,0.18);
+  background: #f0f8ff;
+  transform: translateY(-4px) scale(1.025);
+  cursor: pointer;
+}
+.q-card[clickable]:active {
+  box-shadow: 0 2px 8px rgba(33,150,243,0.08);
+  background: #e3f0fa;
+  transform: scale(0.98);
+}
+
+.file-upload-btn {
+  background: linear-gradient(90deg, #2196f3 0%, #21cbf3 100%);
+  color: #fff;
+  font-weight: 700;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(33,150,243,0.10);
+  padding: 0 20px;
+  height: 36px;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  min-width: 120px;
+  transition: box-shadow 0.18s, transform 0.13s, background 0.18s, border-color 0.18s;
+  overflow: hidden;
+}
+.file-upload-btn:hover {
+  background: linear-gradient(90deg, #42a5f5 0%, #4dd0e1 100%);
+  border-color: #21b6f3;
+  box-shadow: 0 8px 24px rgba(33,150,243,0.18);
+  transform: translateY(-2px) scale(1.04);
+}
+.file-upload-btn:active {
+  background: linear-gradient(90deg, #1976d2 0%, #21b6f3 100%);
+  border-color: #1976d2;
+  box-shadow: 0 1px 4px rgba(33,150,243,0.10);
+  transform: scale(0.96);
+}
+
+.bg-cloud {
+  position: absolute;
+  z-index: 0;
+  opacity: 0.18;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+.cloud1 {
+  top: 32px;
+  left: 32px;
+  width: 90px;
+  height: 60px;
+  background-image: url('/images/cloud1.svg');
+}
+.cloud2 {
+  top: 80px;
+  right: 60px;
+  width: 70px;
+  height: 45px;
+  background-image: url('/images/cloud2.svg');
+}
+.cloud3 {
+  bottom: 40px;
+  left: 120px;
+  width: 60px;
+  height: 40px;
+  background-image: url('/images/cloud3.svg');
+}
+
+.bg-icon {
+  position: absolute;
+  z-index: 0;
+  opacity: 0.13;
+  color: #2196f3;
+  pointer-events: none;
+  font-size: 80px;
+  user-select: none;
+}
+.bg-cloud-icon1 { top: 32px; left: 32px; font-size: 90px; }
+.bg-cloud-icon2 { top: 80px; right: 60px; font-size: 70px; }
+.bg-cloud-icon3 { bottom: 40px; left: 120px; font-size: 60px; }
+.bg-plane-icon  { top: 160px; right: 120px; font-size: 60px; opacity: 0.18; }
+
+@keyframes cloud-move-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100vw); }
+}
+@keyframes cloud-move-right {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(100vw); }
+}
+@keyframes plane-move {
+  0% { transform: translate(0, 0) rotate(-15deg);}
+  100% { transform: translate(-90vw, -60vh) rotate(-15deg);}
+}
+@keyframes plane-move-side {
+  0% { transform: translateX(0) rotate(0deg);}
+  100% { transform: translateX(110vw) rotate(0deg);}
+}
+@keyframes plane-move-diag {
+  0% { transform: translate(0, 0) scaleX(-1);}
+  100% { transform: translate(-100vw, -60vh) scaleX(-1);}
+}
+
+.bg-plane-img {
+  position: absolute;
+  z-index: 0;
+  opacity: 0.18;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: contain;
+  left: -10vw;
+  background-image: url('/images/plane.png');
+  transform: scaleX(-1);
+}
+@keyframes plane-move-side {
+  0% { left: -10vw; }
+  100% { left: 110vw; }
+}
+
+.nav-underline {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: #2196f3;
+  z-index: 2;
+  transition: all 0.2s;
+}
+.nav-active {
+  color: #2196f3 !important;
+  font-weight: bold;
+}
+
+.round-checkbox .q-checkbox__bg {
+  border-radius: 50% !important;
+  border: 2px solid #2196f3 !important;
+}
+.round-checkbox .q-checkbox__inner--truthy .q-checkbox__bg {
+  background: #2196f3 !important;
+  border-radius: 50% !important;
+}
+.round-checkbox .q-checkbox__check {
+  border-radius: 50% !important;
+}
