@@ -58,8 +58,9 @@ ENV/
 env/
 .venv/
 
-# Python cache files
-backend/__pycache__/config.cpython-313.pyc
+# Model files
+*.pt
+backend/models/pytorch/*.pt
 
 # IDE
 .vscode/
