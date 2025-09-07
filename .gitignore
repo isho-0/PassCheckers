@@ -8,10 +8,13 @@ dist
 
 # Node dependencies
 node_modules
+frontend/node_modules
 
 # Logs
-logs
+logs/
 *.log
+frontend.log
+backend.log
 
 # Misc
 .DS_Store
@@ -22,6 +25,48 @@ logs
 .env
 .env.*
 !.env.example
+backend/.env
+backend/.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+backend/venv/
+venv/
+ENV/
+env/
+.venv/
 
 # Model files
 *.pt
+backend/models/pytorch/*.pt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
