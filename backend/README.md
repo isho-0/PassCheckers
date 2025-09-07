@@ -1,6 +1,34 @@
 # PassCheckers Backend API
 
-Flask 기반의 백엔드 API 서버입니다.
+Flask 기반의 백엔드 API 서버입니다.  
+AI 이미지 분석, 사용자 인증, 데이터베이스 관리를 담당합니다.
+
+## 📁 디렉터리 구조
+
+```
+backend/
+├── models/               # 데이터 모델
+│   ├── user.py          # 사용자 모델
+│   └── pytorch/         # AI 모델 파일
+├── repository/          # 데이터 접근 계층
+│   └── user_repo.py     # 사용자 데이터 접근
+├── service/             # 비즈니스 로직
+│   └── user_service.py  # 사용자 서비스
+├── routes/              # API 라우트 (미사용)
+├── classification/      # 분류 관련 모듈
+├── matching/            # 매칭 관련 모듈
+├── sku/                 # SKU 관련 모듈
+├── yolo/                # YOLO 관련 모듈
+├── app.py               # Flask 앱 메인 파일
+├── config.py            # 설정 파일
+└── requirements.txt     # Python 의존성
+```
+
+## ⚠️ 중요 사항
+
+- `backend_merge_file/` 폴더는 **절대 수정하지 마세요**
+- 이 폴더는 다른 환경에서 작업된 코드로, 병합 시 참고용입니다
+- 모든 수정 작업은 현재 `backend/` 폴더에서 진행하세요
 
 ## 설치 및 실행
 
