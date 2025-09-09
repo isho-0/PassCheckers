@@ -66,6 +66,7 @@ def init_db():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     """)
     
+    # images 테이블 생성 (이미지 저장용)
     conn.commit()
     cursor.close()
     conn.close()
