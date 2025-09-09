@@ -454,7 +454,7 @@ const saveChanges = async () => {
                 image_id: imageId.value,
                 item_ids: itemsToDelete.map(item => item.item_id)
             };
-            const response = await fetch('http://localhost:5001/api/items/delete', {
+            const response = await fetch('http://' + window.location.hostname + ':5001/api/items/delete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(deletePayload)
@@ -473,7 +473,7 @@ const saveChanges = async () => {
                 image_id: imageId.value,
                 new_items: itemsToAdd.map(item => ({ name_ko: item.name_ko, bbox: item.bbox }))
             };
-            const response = await fetch('http://localhost:5001/api/items/add', {
+            const response = await fetch('http://' + window.Location.hostname + ':5001/api/items/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(addPayload)
@@ -536,7 +536,7 @@ const handleEnterKey = async (event, index) => {
 
   if (selectComponent && currentInputValue) {
     try {
-      const response = await fetch(`http://localhost:5001/api/items/autocomplete?q=${currentInputValue}`);
+      const response = await fetch('http://' + window.Location.hostname + ':5001/api/items/autocomplete?q=${currentInputValue}');
       if (!response.ok) throw new Error('Network response was not ok');
       
       const suggestions = await response.json();
