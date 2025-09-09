@@ -6,7 +6,7 @@
       <div class="hero-content">
         <div class="hero-text">
           <h1 class="hero-title">
-            여행을 더 편리하게, <span class="highlight">수하물 도우미</span>
+            여행을 더 편리하게, <br><span class="highlight">수하물 도우미</span>
           </h1>
           <p class="hero-description">
             수하물 분류, 무게 예측, 패킹 도우미까지<br>
