@@ -67,6 +67,68 @@ def init_db():
     """)
     
     # images 테이블 생성 (이미지 저장용)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS images (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id VARCHAR(100) NOT NULL,
+            image_data LONGBLOB NOT NULL,
+            width INT NOT NULL,
+            height INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    """)
+    
+    # items 테이블 생성 (물품 정보용)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            item_name VARCHAR(255) NOT NULL UNIQUE,
+            item_name_EN VARCHAR(255),
+            carry_on_allowed VARCHAR(50),
+            checked_baggage_allowed VARCHAR(50),
+            notes TEXT,
+            notes_EN TEXT,
+            source VARCHAR(50) DEFAULT 'manual'
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    """)
+    
+    # 기존 테이블에 notes_EN 컬럼이 없으면 추가
+    try:
+        cursor.execute("ALTER TABLE items ADD COLUMN notes_EN TEXT")
+        print("Added notes_EN column to items table")
+    except Exception as e:
+        if "Duplicate column name" in str(e):
+            print("notes_EN column already exists")
+        else:
+            print(f"Error adding notes_EN column: {e}")
+    
+    # 기존 테이블에 source 컬럼이 없으면 추가
+    try:
+        cursor.execute("ALTER TABLE items ADD COLUMN source VARCHAR(50) DEFAULT 'manual'")
+        print("Added source column to items table")
+    except Exception as e:
+        if "Duplicate column name" in str(e):
+            print("source column already exists")
+        else:
+            print(f"Error adding source column: {e}")
+    
+    # detected_items 테이블 생성 (탐지된 물품용)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS detected_items (
+            item_id INT AUTO_INCREMENT PRIMARY KEY,
+            image_id INT NOT NULL,
+            item_name_EN VARCHAR(255),
+            item_name VARCHAR(255) NOT NULL,
+            bbox_x_min FLOAT NOT NULL,
+            bbox_y_min FLOAT NOT NULL,
+            bbox_x_max FLOAT NOT NULL,
+            bbox_y_max FLOAT NOT NULL,
+            packing_info VARCHAR(50) DEFAULT 'none',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    """)
+    
     conn.commit()
     cursor.close()
     conn.close()
