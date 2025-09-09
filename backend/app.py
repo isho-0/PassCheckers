@@ -11,6 +11,9 @@ from urllib.parse import urlparse
 from functools import wraps
 from repository.user_repo import UserRepository
 from service.user_service import UserService, UserExistsException, InvalidCredentialsException
+from routes.classify import classify_bp
+from routes.items import items_bp
+from routes.analysis import analysis_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
