@@ -24,6 +24,11 @@ jwt = JWTManager(app)
 # CORS 설정
 CORS(app, origins=Config.CORS_ORIGINS, supports_credentials=True)
 
+# Blueprint 등록
+app.register_blueprint(classify_bp)
+app.register_blueprint(items_bp)
+app.register_blueprint(analysis_bp)
+
 # Redis 연결
 redis_client = redis.from_url(Config.REDIS_URL)
 
