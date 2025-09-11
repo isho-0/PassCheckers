@@ -10,121 +10,149 @@
       </p>
     </section>
 
-    <!-- 메인 카드: 좌우 분할 -->
-    <div class="page-section" style="background:#fdfdff; border:1px solid #e8e8e8;">
-      <div class="row q-col-gutter-md">
-        <!-- 왼쪽: 원본 이미지 -->
-        <div class="col-12 col-md-6">
-          <div style="font-weight:600; font-size:1.2rem; margin-bottom:16px; text-align:center;">
-            원본 이미지
-          </div>
-          <q-card flat bordered class="image-card">
-            <div ref="imageContainerRef" class="image-container">
-              <q-img 
-                :src="imageUrl" 
-                style="border-radius: 16px; max-height: 400px;" 
-                fit="contain"
-                @load="isImageLoaded = true"
-              >
-                <template v-slot:error>
-                  <div class="absolute-full flex flex-center bg-negative text-white">
-                    이미지를 불러올 수 없습니다
+    <!-- 메인 카드: 수하물 분석 결과 -->
+    <div class="page-section" style="background:#f8fbff; border:1px solid #e3f0fa;">
+      <div style="text-align:center; font-weight:600; font-size:1.2rem; margin-bottom:16px; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <q-icon name="analytics" color="primary" size="28px" />
+        수하물 분석 결과
+      </div>
+      <div style="text-align:center; color:#888; font-size:1rem; margin-bottom:24px;">
+        업로드하신 이미지를 기반으로 분석된 수하물 정보입니다
+      </div>
+      
+      <!-- 분석 결과 컨테이너 -->
+      <div style="background:#fff; border-radius:16px; padding:24px; box-shadow:0 2px 8px rgba(33,150,243,0.08);">
+        <div class="row q-col-gutter-md">
+          <!-- 왼쪽: 원본 이미지 -->
+          <div class="col-12 col-md-6">
+            <div style="font-weight:600; font-size:1.1rem; margin-bottom:16px; text-align:center; color:#333;">
+              원본 이미지
+            </div>
+            <q-card flat bordered class="image-card" style="text-align: center; height: 450px; display: flex; align-items: center; justify-content: center;">
+              <div ref="imageContainerRef" class="image-container" style="position: relative; display: inline-block;">
+                <img 
+                  :src="imageUrl" 
+                  style="border-radius: 16px; max-width: 100%; max-height: 100%; object-fit: contain;" 
+                  @load="isImageLoaded = true"
+                  @error="handleImageError"
+                  alt="분석된 이미지"
+                />
+                
+
+                <!-- Bounding Box 표시 시작 -->
+                <template v-if="isImageLoaded">
+                  <div
+                    v-for="(item, index) in detectionResults"
+                    :key="item.item_id || item.name_ko"
+                    :class="['bounding-box', { 'bounding-box--hovered': hoveredIndex === index }]"
+                    :style="calculateBoxStyle(item.bbox, imageContainerRef, originalImageSize)"
+                  >
+                    <div class="box-label">{{ item.name_ko }}</div>
                   </div>
                 </template>
-              </q-img>
+                <!-- Bounding Box 표시 끝 -->
 
-              <!-- Bounding Box 표시 시작 -->
-              <template v-if="isImageLoaded">
-                <div
-                  v-for="(item, index) in detectionResults"
-                  :key="item.item_id || item.name_ko"
-                  :class="['bounding-box', { 'bounding-box--hovered': hoveredIndex === index }]"
-                  :style="calculateBoxStyle(item.bbox, imageContainerRef, originalImageSize)"
-                >
-                  <div class="box-label">{{ item.name_ko }}</div>
-                </div>
-              </template>
-              <!-- Bounding Box 표시 끝 -->
-
-            </div>
-          </q-card>
-        </div>
-
-        <!-- 오른쪽: 탐지 결과 -->
-        <div class="col-12 col-md-6">
-          <div style="font-weight:600; font-size:1.2rem; margin-bottom:16px; text-align:center;">
-            탐지 결과
+              </div>
+            </q-card>
           </div>
-          <q-card flat bordered class="results-card">
-            <div v-if="isLoading" class="column items-center justify-center" style="height:100%;">
-              <q-spinner-dots color="primary" size="3em" />
-              <div class="q-mt-md text-grey-7">결과를 불러오고 있습니다...</div>
+
+          <!-- 오른쪽: 탐지 결과 -->
+          <div class="col-12 col-md-6">
+            <div style="font-weight:600; font-size:1.1rem; margin-bottom:16px; text-align:center; color:#333;">
+              탐지 결과
             </div>
-            <div v-else-if="detectionResults.length === 0" class="column items-center justify-center" style="height:100%;">
-              <q-icon name="search_off" size="3em" color="grey-5" />
-              <div class="q-mt-md text-grey-7">탐지된 물품이 없습니다.</div>
-            </div>
-            <div v-else class="column" style="height:100%;">
-              <q-card-section class="row items-center justify-between q-py-sm">
-                <div class="text-weight-bold">탐지된 물품 목록</div>
-                <q-btn icon="edit" label="물품 수정/추가" flat dense @click="openEditModal" />
-              </q-card-section>
-              <q-separator />
-              <q-list separator class="col">
-                <div v-for="(item, index) in detectionResults" :key="item.item_id || item.name_ko">
-                  <q-item 
-                    @mouseenter="hoveredIndex = index"
-                    @mouseleave="hoveredIndex = null"
-                    clickable
-                    @click="toggleAccordion(index)"
-                  >
-                    <q-item-section avatar>
-                      <q-icon :name="getIconFor(item.name_ko)" color="primary" />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label class="text-weight-medium">{{ item.name_ko }}</q-item-label>
-                      <q-item-label caption v-if="item.confidence">정확도: {{ (item.confidence * 100).toFixed(0) }}%</q-item-label>
-                    </q-item-section>
-                    <q-item-section side>
-                      <div class="row items-center no-wrap">
-                        <div class="column items-end">
-                          <q-badge :color="getSpecialCarryOnColor(item.carry_on_allowed)" class="q-mb-xs status-badge-simple">
-                            기내
-                          </q-badge>
-                          <q-badge :color="getCheckedColor(item.checked_baggage_allowed)" class="status-badge-simple">
-                            위탁
-                          </q-badge>
+            <q-card flat bordered class="results-card" style="height: 450px;">
+              <div v-if="isLoading" class="column items-center justify-center" style="height:100%;">
+                <q-spinner-dots color="primary" size="3em" />
+                <div class="q-mt-md text-grey-7">결과를 불러오고 있습니다...</div>
+              </div>
+              <div v-else-if="detectionResults.length === 0" class="column items-center justify-center" style="height:100%;">
+                <q-icon name="search_off" size="3em" color="grey-5" />
+                <div class="q-mt-md text-grey-7">탐지된 물품이 없습니다.</div>
+              </div>
+              <div v-else class="column" style="height:100%;">
+                <q-card-section class="row items-center justify-between q-py-sm">
+                  <div class="text-weight-bold">탐지된 물품 목록</div>
+                  <q-btn icon="edit" label="물품 수정/추가" flat dense @click="openEditModal" />
+                </q-card-section>
+                <q-separator />
+                <q-scroll-area style="height: 350px;" class="col">
+                  <q-list separator>
+                  <div v-for="(item, index) in detectionResults" :key="item.item_id || item.name_ko">
+                    <q-item 
+                      @mouseenter="hoveredIndex = index"
+                      @mouseleave="hoveredIndex = null"
+                      clickable
+                      @click="toggleAccordion(index)"
+                    >
+                      <q-item-section avatar>
+                        <q-icon :name="getIconFor(item.name_ko)" color="primary" />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label class="text-weight-medium">{{ item.name_ko }}</q-item-label>
+                        <q-item-label caption v-if="item.confidence">정확도: {{ (item.confidence * 100).toFixed(0) }}%</q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <div class="row items-center no-wrap">
+                          <div class="column items-end">
+                            <q-badge :color="getSpecialCarryOnColor(item.carry_on_allowed)" class="q-mb-xs status-badge-simple">
+                              기내
+                            </q-badge>
+                            <q-badge :color="getCheckedColor(item.checked_baggage_allowed)" class="status-badge-simple">
+                              위탁
+                            </q-badge>
+                          </div>
+                          <q-icon class="q-ml-sm" :name="expandedIndex === index ? 'expand_less' : 'expand_more'" />
                         </div>
-                        <q-icon class="q-ml-sm" :name="expandedIndex === index ? 'expand_less' : 'expand_more'" />
+                      </q-item-section>
+                    </q-item>
+                    <q-slide-transition>
+                      <div v-show="expandedIndex === index">
+                        <q-separator />
+                        <div class="details-section q-pa-md">
+                          <div class="row items-center q-mb-sm">
+                            <div class="text-weight-bold q-mr-md">기내 반입:</div>
+                            <q-badge :color="getSpecialCarryOnColor(item.carry_on_allowed)" class="status-badge-large">
+                              {{ item.carry_on_allowed || '확인 불가' }}
+                            </q-badge>
+                          </div>
+                          <div class="row items-center q-mb-md">
+                            <div class="text-weight-bold q-mr-md">위탁 수하물:</div>
+                            <q-badge :color="getCheckedColor(item.checked_baggage_allowed)" class="status-badge-large">
+                              {{ item.checked_baggage_allowed || '확인 불가' }}
+                            </q-badge>
+                          </div>
+                          <div class="text-caption text-grey-8">{{ item.notes || '상세한 규정 내용이 없습니다.' }}</div>
+                        </div>
                       </div>
-                    </q-item-section>
-                  </q-item>
-                  <q-slide-transition>
-                    <div v-show="expandedIndex === index">
-                      <q-separator />
-                      <div class="details-section q-pa-md">
-                        <div class="row items-center q-mb-sm">
-                          <div class="text-weight-bold q-mr-md">기내 반입:</div>
-                          <q-badge :color="getSpecialCarryOnColor(item.carry_on_allowed)" class="status-badge-large">
-                            {{ item.carry_on_allowed || '확인 불가' }}
-                          </q-badge>
-                        </div>
-                        <div class="row items-center q-mb-md">
-                          <div class="text-weight-bold q-mr-md">위탁 수하물:</div>
-                          <q-badge :color="getCheckedColor(item.checked_baggage_allowed)" class="status-badge-large">
-                            {{ item.checked_baggage_allowed || '확인 불가' }}
-                          </q-badge>
-                        </div>
-                        <div class="text-caption text-grey-8">{{ item.notes || '상세한 규정 내용이 없습니다.' }}</div>
-                      </div>
-                    </div>
-                  </q-slide-transition>
-                </div>
-              </q-list>
-            </div>
-          </q-card>
+                    </q-slide-transition>
+                  </div>
+                  </q-list>
+                </q-scroll-area>
+              </div>
+            </q-card>
+          </div>
         </div>
       </div>
+    </div>
+
+    <!-- 하단 액션 버튼들 -->
+    <div class="row justify-center q-mt-lg q-gutter-md">
+      <q-btn 
+        icon="photo_camera" 
+        label="다른 이미지 선택" 
+        color="primary" 
+        outline
+        @click="selectNewImage"
+      />
+      <q-btn 
+        icon="save" 
+        label="분석 결과 저장" 
+        color="positive"
+        @click.stop="saveAnalysisResults"
+        :loading="isSavingResults"
+        :disable="isSavingResults"
+      />
     </div>
 
     <!-- 물품 수정/추가 팝업 -->
@@ -261,19 +289,30 @@
       </q-card>
     </q-dialog>
 
+    <!-- 분류 토스트 -->
+    <ClassificationToast 
+      v-if="showToast"
+      :title="toastTitle"
+      :message="toastMessage"
+      redirect-to="/"
+    />
+
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, nextTick, onBeforeUpdate } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
+import ClassificationToast from './ClassificationToast.vue'
 
 const $q = useQuasar()
 const route = useRoute()
+const router = useRouter()
 
 const isLoading = ref(true)
 const isSaving = ref(false)
+const isSavingResults = ref(false)
 const imageUrl = ref('')
 const imageId = ref(null)
 const detectionResults = ref([])
@@ -282,6 +321,11 @@ const hoveredIndex = ref(null)
 const originalImageSize = ref({ width: 1, height: 1 });
 const expandedIndex = ref(null); // For accordion
 const isImageLoaded = ref(false);
+
+// 토스트 상태
+const showToast = ref(false)
+const toastTitle = ref('')
+const toastMessage = ref('')
 
 // --- Editor Modal State ---
 const showEditModal = ref(false)
@@ -556,6 +600,12 @@ const onImageLoad = () => {
   isImageLoaded.value = true;
 }
 
+const handleImageError = (error) => {
+  console.error('이미지 로드 오류:', error);
+  console.error('이미지 URL:', imageUrl.value);
+  isImageLoaded.value = false;
+}
+
 const findDetectionResultIndex = (item) => {
   return detectionResults.value.findIndex(dr => dr.item_id === item.item_id);
 };
@@ -569,11 +619,58 @@ const toggleAccordion = (index) => {
 };
 
 const getIconFor = (itemName) => {
-  if (!itemName) return 'check_box_outline_blank';
-  if (itemName.includes('노트북')) return 'laptop_chromebook';
-  if (itemName.includes('배터리')) return 'battery_charging_full';
-  if (itemName.includes('가위')) return 'content_cut';
-  return 'check_box_outline_blank';
+  if (!itemName) return 'inventory_2';
+  
+  // 전자기기
+  if (itemName.includes('노트북') || itemName.includes('Laptop')) return 'laptop';
+  if (itemName.includes('폰') || itemName.includes('Phone')) return 'phone';
+  if (itemName.includes('태블릿') || itemName.includes('Tablet')) return 'tablet';
+  if (itemName.includes('카메라') || itemName.includes('Camera')) return 'camera_alt';
+  if (itemName.includes('배터리') || itemName.includes('Battery')) return 'battery_charging_full';
+  if (itemName.includes('충전기') || itemName.includes('Charger')) return 'power';
+  
+  // 액체류
+  if (itemName.includes('액체') || itemName.includes('Liquid') || itemName.includes('물') || itemName.includes('Water')) return 'water_drop';
+  if (itemName.includes('튜브') || itemName.includes('Tube')) return 'tube';
+  if (itemName.includes('병') || itemName.includes('Bottle')) return 'local_drink';
+  if (itemName.includes('샴푸') || itemName.includes('Shampoo')) return 'shower';
+  if (itemName.includes('로션') || itemName.includes('Lotion')) return 'opacity';
+  
+  // 음식
+  if (itemName.includes('음식') || itemName.includes('Food') || itemName.includes('라면') || itemName.includes('Ramen')) return 'restaurant';
+  if (itemName.includes('김치') || itemName.includes('Kimchi')) return 'local_dining';
+  if (itemName.includes('소스') || itemName.includes('Sauce')) return 'local_pizza';
+  if (itemName.includes('과자') || itemName.includes('Snack')) return 'cookie';
+  
+  // 위험물품
+  if (itemName.includes('가위') || itemName.includes('Scissors')) return 'content_cut';
+  if (itemName.includes('나이프') || itemName.includes('Knife')) return 'dangerous';
+  if (itemName.includes('칼') || itemName.includes('Blade')) return 'dangerous';
+  if (itemName.includes('총') || itemName.includes('Gun')) return 'warning';
+  
+  // 개인용품
+  if (itemName.includes('가방') || itemName.includes('Bag')) return 'shopping_bag';
+  if (itemName.includes('지갑') || itemName.includes('Wallet')) return 'account_balance_wallet';
+  if (itemName.includes('여권') || itemName.includes('Passport')) return 'badge';
+  if (itemName.includes('캐리어') || itemName.includes('Suitcase')) return 'luggage';
+  if (itemName.includes('안경') || itemName.includes('Glasses')) return 'visibility';
+  
+  // 화장품
+  if (itemName.includes('립스틱') || itemName.includes('Lipstick')) return 'face';
+  if (itemName.includes('화장') || itemName.includes('Makeup')) return 'face';
+  if (itemName.includes('향수') || itemName.includes('Perfume')) return 'spa';
+  
+  // 의료용품
+  if (itemName.includes('약') || itemName.includes('Medicine')) return 'medication';
+  if (itemName.includes('마스크') || itemName.includes('Mask')) return 'masks';
+  if (itemName.includes('물티슈') || itemName.includes('Wipes')) return 'cleaning_services';
+  
+  // 기타
+  if (itemName.includes('담배') || itemName.includes('Cigarette')) return 'smoking_rooms';
+  if (itemName.includes('열쇠') || itemName.includes('Key')) return 'vpn_key';
+  if (itemName.includes('생리대') || itemName.includes('Pad')) return 'local_hospital';
+  
+  return 'inventory_2';
 }
 
 const getSpecialCarryOnColor = (status) => {
@@ -617,11 +714,133 @@ onMounted(() => {
   }
   if (route.query.image) {
     imageUrl.value = route.query.image;
+  } else if (route.query.results) {
+    // results 데이터에서 이미지 URL 추출 시도
+    try {
+      const resultData = JSON.parse(route.query.results);
+      if (resultData.image_url) {
+        imageUrl.value = resultData.image_url;
+      }
+    } catch (e) {
+      console.error("Error extracting image URL from results:", e);
+    }
   }
   isLoading.value = false;
 
+  // 페이드 인 애니메이션
+  nextTick(() => {
+    const container = document.querySelector('.page-section')
+    if (container) {
+      container.style.transition = 'opacity 0.3s ease-in'
+      container.style.opacity = '1'
+    }
+  })
+
   window.addEventListener('resize', handleResize);
 })
+
+// 새로운 이미지 선택 함수
+const selectNewImage = () => {
+  // 페이드 아웃 애니메이션 시작
+  const container = document.querySelector('.page-section')
+  if (container) {
+    container.style.transition = 'opacity 0.3s ease-out'
+    container.style.opacity = '0'
+  }
+  
+  // 애니메이션 완료 후 페이지 이동
+  setTimeout(() => {
+    // 현재 분석 정보 초기화
+    detectionResults.value = []
+    imageUrl.value = ''
+    imageId.value = null
+    originalImageSize.value = { width: 1, height: 1 }
+    expandedIndex.value = null
+    isImageLoaded.value = false
+    hoveredIndex.value = null
+    
+    // Vue Router를 사용하여 분류 페이지로 이동 (쿼리 파라미터 제거)
+    router.push('/classification')
+  }, 300) // 0.3초 후 이동
+}
+
+// 분석 결과 저장 함수
+const saveAnalysisResults = async (event) => {
+  console.log('=== 저장 함수 호출됨 ===');
+  console.log('이벤트:', event);
+  console.log('isSavingResults.value:', isSavingResults.value);
+  console.log('detectionResults.value:', detectionResults.value);
+  
+  // 이벤트 전파 중지
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  
+  if (isSavingResults.value) {
+    console.log('이미 저장 중이므로 리턴');
+    return;
+  }
+  
+  isSavingResults.value = true;
+  console.log('저장 중...');
+  
+  try {
+    // 분석 결과 데이터 구성
+    const analysisData = {
+      user_id: 'custom1', // 실제로는 인증된 사용자 ID 사용
+      image_id: imageId.value,
+      image_url: imageUrl.value,
+      image_size: originalImageSize.value,
+      detected_items: detectionResults.value.map(item => ({
+        name_ko: item.name_ko,
+        name_en: item.name_en,
+        confidence: item.confidence,
+        carry_on_allowed: item.carry_on_allowed,
+        checked_baggage_allowed: item.checked_baggage_allowed,
+        notes: item.notes,
+        notes_EN: item.notes_EN,
+        source: item.source,
+        bbox: item.bbox
+      })),
+      total_items: detectionResults.value.length,
+      analysis_date: new Date().toISOString()
+    };
+
+    // 백엔드에 저장 요청
+    const response = await fetch('http://' + window.location.hostname + ':5001/api/analysis/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(analysisData)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || '저장 중 오류가 발생했습니다.');
+    }
+
+    const result = await response.json();
+    console.log('저장 성공 응답:', result);
+    
+    // 저장 성공 토스트 표시
+    toastTitle.value = '저장 완료'
+    toastMessage.value = `분석 결과가 성공적으로 저장되었습니다. (총 ${detectionResults.value.length}개 물품)`
+    showToast.value = true
+    
+    console.log('토스트 메시지 표시 완료');
+
+  } catch (error) {
+    console.error('Error saving analysis results:', error);
+    // 저장 실패 토스트 표시
+    toastTitle.value = '저장 실패'
+    toastMessage.value = `저장 중 오류가 발생했습니다: ${error.message}`
+    showToast.value = true
+  } finally {
+    isSavingResults.value = false;
+  }
+}
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
@@ -629,7 +848,16 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.page-section { border-radius: 20px; padding: 32px; margin: 0 auto; max-width: 1200px; width: 100%; box-sizing: border-box; }
+.page-section { 
+  border-radius: 20px; 
+  padding: 32px; 
+  margin: 0 auto; 
+  max-width: 1200px; 
+  width: 100%; 
+  box-sizing: border-box; 
+  opacity: 0; /* 초기 투명도 설정 */
+  transition: opacity 0.3s ease-in; /* 기본 전환 효과 */
+}
 .image-card, .results-card { border-radius: 16px; height: 100%; min-height: 400px; }
 .editor-image-container { position: relative; width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
 .drawing-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; }
