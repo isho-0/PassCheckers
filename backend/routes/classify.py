@@ -24,7 +24,6 @@ def run_detection(img_bytes, conn, image_id, img_width, img_height):
     # YOLO 모델로 객체 분류
     yolo_predictions = predict_name_with_yolo(img_bytes, bboxes)
     print(f"[DETECTION] YOLO classified {len(yolo_predictions)} objects")
-    
     """
     # 크롭 이미지 저장 (성능 개선을 위한 중요한 기능)
     if bboxes:
