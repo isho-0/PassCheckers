@@ -35,8 +35,9 @@ def save_analysis_results():
                         image_height INT,
                         total_items INT NOT NULL,
                         analysis_date DATETIME NOT NULL,
+                        destination VARCHAR(100),
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
+                        FOREIGN KEY (image_id) REFERENCES images(image_id) ON DELETE CASCADE
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 
@@ -61,6 +62,22 @@ def save_analysis_results():
                         FOREIGN KEY (analysis_id) REFERENCES analysis_results(id) ON DELETE CASCADE
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
+
+                # Schema migration: destination 컬럼이 없는 경우 추가
+                db_name = conn.db.decode() if isinstance(conn.db, bytes) else conn.db
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt
+                    FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = %s
+                    AND TABLE_NAME = 'analysis_results'
+                    AND COLUMN_NAME = 'destination'
+                """, (db_name,))
+                if cursor.fetchone()['cnt'] == 0:
+                    cursor.execute("""
+                        ALTER TABLE analysis_results
+                        ADD COLUMN destination VARCHAR(100) NULL
+                    """)
+                    print("[DB MIGRATION] 'destination' column added to 'analysis_results' table.")
                 
                 # 분석 결과 저장
                 # ISO 형식의 날짜를 MySQL datetime 형식으로 변환
@@ -71,8 +88,8 @@ def save_analysis_results():
                 
                 cursor.execute("""
                     INSERT INTO analysis_results 
-                    (user_id, image_id, image_url, image_width, image_height, total_items, analysis_date)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (user_id, image_id, image_url, image_width, image_height, total_items, analysis_date, destination)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     data['user_id'],
                     data['image_id'],
@@ -80,7 +97,8 @@ def save_analysis_results():
                     data.get('image_size', {}).get('width', 0),
                     data.get('image_size', {}).get('height', 0),
                     data['total_items'],
-                    analysis_date
+                    analysis_date,
+                    data.get('destination', None)
                 ))
                 
                 analysis_id = cursor.lastrowid
@@ -175,7 +193,7 @@ def get_analysis_detail(analysis_id):
                 cursor.execute("""
                     SELECT ar.*, i.width, i.height
                     FROM analysis_results ar
-                    LEFT JOIN images i ON ar.image_id = i.id
+                                        LEFT JOIN images i ON ar.image_id = i.image_id
                     WHERE ar.id = %s
                 """, (analysis_id,))
                 

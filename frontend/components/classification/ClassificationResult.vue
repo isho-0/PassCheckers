@@ -54,6 +54,40 @@
 
               </div>
             </q-card>
+
+            <!-- 여행지 입력 UI -->
+            <div class="column items-center q-mt-md" style="min-height: 60px;">
+              <transition
+                appear
+                enter-active-class="animated fadeIn"
+                leave-active-class="animated fadeOut"
+                @after-leave="isSaveButtonVisible = true"
+              >
+                <div v-if="showDestinationInput" class="row items-center q-gutter-md">
+                  <q-input
+                    v-model="destination"
+                    label="여행지 입력"
+                    outlined
+                    dense
+                    autofocus
+                    @keyup.enter="saveAnalysisResults"
+                  />
+                  <q-btn 
+                    label="저장" 
+                    color="positive"
+                    @click="saveAnalysisResults"
+                    :loading="isSavingResults"
+                  />
+                  <q-btn 
+                    label="취소" 
+                    color="grey-7"
+                    flat
+                    @click="showDestinationInput = false"
+                  />
+                </div>
+              </transition>
+            </div>
+
           </div>
 
           <!-- 오른쪽: 탐지 결과 -->
@@ -136,7 +170,7 @@
       </div>
     </div>
 
-    <!-- 하단 액션 버튼들 -->
+                <!-- 하단 액션 버튼들 -->
     <div class="row justify-center q-mt-lg q-gutter-md">
       <q-btn 
         icon="photo_camera" 
@@ -145,14 +179,20 @@
         outline
         @click="selectNewImage"
       />
-      <q-btn 
-        icon="save" 
-        label="분석 결과 저장" 
-        color="positive"
-        @click.stop="saveAnalysisResults"
-        :loading="isSavingResults"
-        :disable="isSavingResults"
-      />
+      <transition
+        appear
+        enter-active-class="animated fadeIn"
+        leave-active-class="animated fadeOut"
+      >
+        <q-btn 
+          v-if="isSaveButtonVisible"
+          icon="save" 
+          label="분석 결과 저장" 
+          color="positive"
+          @click="isSaveButtonVisible = false; showDestinationInput = true"
+          :disable="isSavingResults"
+        />
+      </transition>
     </div>
 
     <!-- 물품 수정/추가 팝업 -->
@@ -305,10 +345,12 @@ import { ref, onMounted, onUnmounted, computed, nextTick, onBeforeUpdate } from 
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import ClassificationToast from './ClassificationToast.vue'
+import { useAuth } from '~/composables/useAuth'
 
 const $q = useQuasar()
 const route = useRoute()
 const router = useRouter()
+const { user } = useAuth()
 
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -340,6 +382,12 @@ const isDrawing = ref(false)
 const drawStartPoint = ref({ x: 0, y: 0 })
 const drawingRect = ref({ x: 0, y: 0, width: 0, height: 0 })
 const activeDrawIndex = ref(null)
+
+// --- Destination State ---
+const showDestinationInput = ref(false)
+const destination = ref('')
+const isSaveButtonVisible = ref(true)
+
 
 // BBox 스타일 계산 로직을 공통 함수로 추출
 const calculateBoxStyle = (bbox, containerEl, imageSize) => {
@@ -765,30 +813,33 @@ const selectNewImage = () => {
 }
 
 // 분석 결과 저장 함수
-const saveAnalysisResults = async (event) => {
-  console.log('=== 저장 함수 호출됨 ===');
-  console.log('이벤트:', event);
-  console.log('isSavingResults.value:', isSavingResults.value);
-  console.log('detectionResults.value:', detectionResults.value);
-  
-  // 이벤트 전파 중지
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-  
-  if (isSavingResults.value) {
-    console.log('이미 저장 중이므로 리턴');
+const saveAnalysisResults = async () => {
+  if (isSavingResults.value) return;
+
+  if (!destination.value) {
+    $q.notify({
+      type: 'warning',
+      message: '여행지를 입력해주세요.',
+      position: 'top'
+    });
     return;
   }
   
   isSavingResults.value = true;
-  console.log('저장 중...');
   
   try {
-    // 분석 결과 데이터 구성
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      throw new Error('인증 토큰을 찾을 수 없습니다. 다시 로그인해주세요.');
+    }
+
+    const storedUser = JSON.parse(localStorage.getItem('user'));
+    if (!storedUser || !storedUser.id) {
+        throw new Error('사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.');
+    }
+
     const analysisData = {
-      user_id: 'custom1', // 실제로는 인증된 사용자 ID 사용
+      user_id: storedUser.id,
       image_id: imageId.value,
       image_url: imageUrl.value,
       image_size: originalImageSize.value,
@@ -804,14 +855,15 @@ const saveAnalysisResults = async (event) => {
         bbox: item.bbox
       })),
       total_items: detectionResults.value.length,
-      analysis_date: new Date().toISOString()
+      analysis_date: new Date().toISOString(),
+      destination: destination.value
     };
 
-    // 백엔드에 저장 요청
     const response = await fetch('http://' + window.location.hostname + ':5001/api/analysis/save', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(analysisData)
     });
@@ -822,18 +874,16 @@ const saveAnalysisResults = async (event) => {
     }
 
     const result = await response.json();
-    console.log('저장 성공 응답:', result);
     
-    // 저장 성공 토스트 표시
     toastTitle.value = '저장 완료'
     toastMessage.value = `분석 결과가 성공적으로 저장되었습니다. (총 ${detectionResults.value.length}개 물품)`
     showToast.value = true
     
-    console.log('토스트 메시지 표시 완료');
+    showDestinationInput.value = false;
+    destination.value = '';
 
   } catch (error) {
     console.error('Error saving analysis results:', error);
-    // 저장 실패 토스트 표시
     toastTitle.value = '저장 실패'
     toastMessage.value = `저장 중 오류가 발생했습니다: ${error.message}`
     showToast.value = true
