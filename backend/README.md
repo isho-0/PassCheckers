@@ -78,6 +78,9 @@ python app.py
 ### 시스템
 - `GET /api/health` - 서버 상태 확인
 
+### 아이템/이미지 관련
+- `GET /api/items/image/<image_id>` - ID에 해당하는 원본 이미지를 반환합니다.
+
 ## 환경 변수
 
 - `SECRET_KEY`: Flask 시크릿 키
