@@ -38,6 +38,16 @@
 
         <!-- 오른쪽: 선택된 기록의 무게 예측 결과 -->
         <div style="flex: 2; min-width: 400px;">
+          <!-- Season Buttons Section -->
+          <div class="detail-card" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; background: white;">
+            <span class="card-title" style="font-size: 1rem;">여행지에 계절은 어떤가요?</span>
+            <div style="display: flex; gap: 8px;">
+              <q-btn unelevated no-caps label="여름" :style="getButtonStyle('여름')" @click="selectedSeason = '여름'" />
+              <q-btn unelevated no-caps label="봄/가을" :style="getButtonStyle('봄/가을')" @click="selectedSeason = '봄/가을'" />
+              <q-btn unelevated no-caps label="겨울" :style="getButtonStyle('겨울')" @click="selectedSeason = '겨울'" />
+            </div>
+          </div>
+
           <!-- 이미지 -->
           <q-card flat bordered style="border-radius: 16px; margin-bottom: 24px;">
             <q-img src="https://via.placeholder.com/600x300.png?text=도쿄+여행" style="border-radius: 16px 16px 0 0;" />
@@ -116,6 +126,41 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
+// Type for season
+type Season = '여름' | '봄/가을' | '겨울';
+
+const selectedSeason = ref<Season>('여름'); // 기본값으로 '여름' 선택
+
+// 버튼 스타일을 동적으로 반환하는 함수
+const getButtonStyle = (season: Season) => {
+  const style: { [key: string]: string } = {
+    borderRadius: '16px',
+    transition: 'all 0.3s ease',
+    padding: '4px 16px',
+    border: '1px solid #e0e0e0'
+  };
+
+  if (selectedSeason.value === season) {
+    if (season === '여름') {
+      style.backgroundColor = '#FFEBEE';
+      style.color = '#D32F2F';
+      style.borderColor = '#FFCDD2';
+    } else if (season === '봄/가을') {
+      style.backgroundColor = '#FFF8E1';
+      style.color = '#FFA000';
+      style.borderColor = '#FFECB3';
+    } else { // 겨울
+      style.backgroundColor = '#E1F5FE';
+      style.color = '#0288D1';
+      style.borderColor = '#B3E5FC';
+    }
+  } else {
+    style.backgroundColor = 'white';
+    style.color = '#757575';
+  }
+  return style;
+};
+
 // 가상 데이터 (디자인 확인용)
 const classificationHistory = ref([
   { id: 1, destination: '일본 도쿄', date: '2025-01-15', itemCount: 5 },
@@ -157,6 +202,7 @@ const detectedItems = ref([
 .detail-card {
   border-radius: 16px;
   padding: 16px;
+  border: 1px solid #e3f0fa;
 }
 
 .card-title {
