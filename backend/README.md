@@ -104,7 +104,7 @@ python app.py
 
 ## 개발 환경
 
-- Python 3.8+
+- Python 3.10+
 - Flask 3.0.0
-- MySQL
+- MySQL 8.0.35
 - Redis 
