@@ -4,6 +4,7 @@ from db.database_utils import get_db_connection
 from datetime import datetime
 import json
 import os
+from urllib.parse import urlparse
 
 analysis_bp = Blueprint("analysis", __name__)
 
@@ -86,6 +87,9 @@ def save_analysis_results():
                     # ISO 형식에서 MySQL datetime 형식으로 변환
                     analysis_date = analysis_date.replace('T', ' ').replace('Z', '').split('.')[0]
                 
+                # image_id를 사용하여 영구적인 image_url 생성
+                image_url = f"/api/items/image/{data['image_id']}"
+
                 cursor.execute("""
                     INSERT INTO analysis_results 
                     (user_id, image_id, image_url, image_width, image_height, total_items, analysis_date, destination)
@@ -93,7 +97,7 @@ def save_analysis_results():
                 """, (
                     data['user_id'],
                     data['image_id'],
-                    data.get('image_url', ''),
+                    image_url,  # 생성된 URL 사용
                     data.get('image_size', {}).get('width', 0),
                     data.get('image_size', {}).get('height', 0),
                     data['total_items'],
@@ -149,6 +153,58 @@ def save_analysis_results():
             "details": str(e) if "development" in str(os.environ.get('FLASK_ENV', '')).lower() else "서버 내부 오류"
         }), 500
 
+import requests
+from PIL import Image
+from io import BytesIO
+import hashlib
+
+# 썸네일 저장 디렉토리 (없으면 생성)
+THUMBNAIL_DIR = os.path.join(os.path.dirname(__file__), '..', 'static', 'thumbnails')
+os.makedirs(THUMBNAIL_DIR, exist_ok=True)
+
+def create_thumbnail(image_url, size=(128, 128)):
+    """URL에서 이미지를 받아와 썸네일을 생성하고 파일 경로를 반환합니다."""
+    if not image_url:
+        return None
+    
+    try:
+        # URL을 해시하여 파일 이름으로 사용 (캐싱 효과)
+        url_hash = hashlib.md5(image_url.encode('utf-8')).hexdigest()
+        try:
+            extension = os.path.splitext(urlparse(image_url).path)[1] or '.jpg'
+        except Exception:
+            extension = '.jpg'
+        
+        thumb_filename = f"{url_hash}{extension}"
+        thumb_filepath = os.path.join(THUMBNAIL_DIR, thumb_filename)
+        
+        # 이미 썸네일이 존재하면 해당 경로 반환
+        if os.path.exists(thumb_filepath):
+            return f"/static/thumbnails/{thumb_filename}"
+
+        # 내부 API URL인 경우 전체 주소 구성
+        full_image_url = image_url
+        if image_url.startswith('/api/'):
+            base_url = os.environ.get('API_BASE_URL', 'http://localhost:5001') 
+            full_image_url = f"{base_url}{image_url}"
+
+        response = requests.get(full_image_url, stream=True)
+        response.raise_for_status()
+        
+        img = Image.open(BytesIO(response.content))
+        img.thumbnail(size)
+        
+        # RGBA -> RGB로 변환 (PNG 등 투명 배경 처리)
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+            
+        img.save(thumb_filepath, 'JPEG', quality=90)
+        
+        return f"/static/thumbnails/{thumb_filename}"
+    except Exception as e:
+        print(f"썸네일 생성 실패: {image_url}, 오류: {e}")
+        return None
+
 @analysis_bp.route("/api/analysis/history/<user_id>", methods=["GET"])
 def get_analysis_history(user_id):
     """사용자의 분석 기록을 조회합니다."""
@@ -158,7 +214,7 @@ def get_analysis_history(user_id):
             with conn.cursor() as cursor:
                 cursor.execute("""
                     SELECT ar.id, ar.image_id, ar.image_url, ar.total_items, 
-                           ar.analysis_date, ar.created_at
+                           ar.analysis_date, ar.destination, ar.created_at
                     FROM analysis_results ar
                     WHERE ar.user_id = %s
                     ORDER BY ar.created_at DESC
@@ -166,6 +222,13 @@ def get_analysis_history(user_id):
                 """, (user_id,))
                 
                 results = cursor.fetchall()
+
+                for r in results:
+                    # 날짜 형식 변경
+                    if r['analysis_date']:
+                        r['analysis_date'] = r['analysis_date'].strftime('%Y-%m-%d')
+                    # 썸네일 생성
+                    r['thumbnail_url'] = create_thumbnail(r['image_url'])
                 
                 return jsonify({
                     "message": "분석 기록을 성공적으로 조회했습니다.",

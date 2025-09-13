@@ -21,153 +21,185 @@
             <q-icon name="history" color="primary" size="28px" />
             분류 기록 선택
           </div>
-          <div style="max-height: 620px; overflow-y: auto; padding: 8px;">
+          <div v-if="isLoading" class="text-center">
+            <q-spinner-dots color="primary" size="40px" />
+            <p>분석 기록을 불러오는 중입니다...</p>
+          </div>
+          <div v-else-if="classificationHistory.length === 0" class="text-center text-grey">
+            <q-icon name="info" size="32px" />
+            <p>분석 기록이 없습니다.</p>
+          </div>
+          <div v-else style="max-height: 620px; overflow-y: auto; padding: 8px;">
             <q-card 
               v-for="item in classificationHistory" 
               :key="item.id"
               clickable flat bordered 
-              style="margin-bottom: 16px; border-radius: 12px; padding: 16px; cursor: pointer;"
+              style="margin-bottom: 16px; border-radius: 12px; cursor: pointer; overflow: hidden;"
               class="history-card"
+              :class="{ 'history-card--selected': selectedHistory && selectedHistory.id === item.id }"
+              @click="selectedHistory = item"
             >
-              <div style="font-weight:600; font-size:1.1rem; color:#333;">{{ item.destination }}</div>
-              <div style="font-size:0.9rem; color:#888; margin-top:4px;">{{ item.date }}</div>
-              <div style="font-size:0.9rem; color:#555; margin-top:8px;">{{ item.itemCount }}개 물품</div>
+              <div style="display: flex; align-items: center; gap: 16px; padding: 16px;">
+                <q-img 
+                  :src="item.thumbnail_url ? `${apiBaseUrl}${item.thumbnail_url}` : 'https://via.placeholder.com/80x80.png?text=No+Img'"
+                  style="width: 80px; height: 80px; border-radius: 8px;"
+                >
+                  <template v-slot:error>
+                    <div class="absolute-full flex flex-center bg-grey-3 text-grey-8">
+                      <q-icon name="image_not_supported" size="sm"/>
+                    </div>
+                  </template>
+                </q-img>
+                <div style="flex: 1;">
+                  <div style="font-weight:600; font-size:1.1rem; color:#333;">{{ item.destination || '알 수 없는 목적지' }}</div>
+                  <div style="font-size:0.9rem; color:#888; margin-top:4px;">{{ item.analysis_date }}</div>
+                  <div style="font-size:0.9rem; color:#555; margin-top:8px;">{{ item.total_items }}개 물품</div>
+                </div>
+              </div>
             </q-card>
           </div>
         </div>
 
         <!-- 오른쪽: 선택된 기록의 무게 예측 결과 -->
         <div style="flex: 2; min-width: 400px;">
-          <!-- Season Buttons Section -->
-          <div class="detail-card" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; background: white;">
-            <span class="card-title" style="font-size: 1rem;">여행지에 계절은 어떤가요?</span>
-            <div style="display: flex; gap: 8px;">
-              <q-btn unelevated no-caps label="여름" :style="getButtonStyle('여름')" @click="selectedSeason = '여름'" />
-              <q-btn unelevated no-caps label="봄/가을" :style="getButtonStyle('봄/가을')" @click="selectedSeason = '봄/가을'" />
-              <q-btn unelevated no-caps label="겨울" :style="getButtonStyle('겨울')" @click="selectedSeason = '겨울'" />
-            </div>
+          <div v-if="!selectedHistory" class="flex flex-center text-grey" style="height: 100%; flex-direction: column; gap: 16px; background: #fdfdff; border: 2px dashed #e0e0e0; border-radius: 16px;">
+            <q-icon name="travel_explore" size="60px" />
+            <p style="font-size: 1.2rem;">왼쪽에서 분석 기록을 선택하세요.</p>
           </div>
-
-          <!-- 이미지 -->
-          <q-card flat bordered style="border-radius: 16px; margin-bottom: 24px;">
-            <q-img src="https://via.placeholder.com/600x300.png?text=도쿄+여행" style="border-radius: 16px 16px 0 0;" />
-            <div style="padding: 16px; display:flex; justify-content: space-between; align-items: center; border-top: 1px solid #f0f0f0;">
-              <div style="font-weight: 600; font-size: 1.1rem;">일본 도쿄</div>
-              <div style="font-size: 0.9rem; color: #888;">2025-01-15</div>
+          <div v-else>
+            <!-- Season Buttons Section -->
+            <div class="detail-card" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; background: white;">
+              <span class="card-title" style="font-size: 1rem;">여행지에 계절은 어떤가요?</span>
+              <div style="display: flex; gap: 8px;">
+                <q-btn unelevated no-caps label="여름" class="season-btn summer" :class="{ 'selected': selectedSeason === '여름' }" @click="selectedSeason = '여름'" />
+                <q-btn unelevated no-caps label="봄/가을" class="season-btn autumn" :class="{ 'selected': selectedSeason === '봄/가을' }" @click="selectedSeason = '봄/가을'" />
+                <q-btn unelevated no-caps label="겨울" class="season-btn winter" :class="{ 'selected': selectedSeason === '겨울' }" @click="selectedSeason = '겨울'" />
+              </div>
             </div>
-          </q-card>
 
-          <div style="display: flex; flex-direction: column; gap: 24px;">
-            <!-- 예상 무게 (Full Width) -->
-            <q-card flat bordered class="detail-card">
-              <div class="card-title">
-                <q-icon name="scale" />
-                <span>예상 무게</span>
+            <!-- 이미지 -->
+            <q-card flat bordered style="border-radius: 16px; margin-bottom: 24px;">
+              <q-img 
+                :src="selectedHistory.image_url ? `${apiBaseUrl}${selectedHistory.image_url}` : ''" 
+                style="border-radius: 16px 16px 0 0; max-height: 400px; background-color: #f5f5f5;"
+                fit="contain"
+              >
+                <template v-slot:error>
+                  <div class="absolute-full flex flex-center bg-negative text-white">
+                    원본 이미지를 불러올 수 없습니다.
+                  </div>
+                </template>
+              </q-img>
+              <div style="padding: 16px; display:flex; justify-content: space-between; align-items: center; border-top: 1px solid #f0f0f0;">
+                <div style="font-weight: 600; font-size: 1.1rem;">{{ selectedHistory.destination || '알 수 없는 목적지' }}</div>
+                <div style="font-size: 0.9rem; color: #888;">{{ selectedHistory.analysis_date }}</div>
               </div>
-              <div style="font-size: 2.5rem; font-weight: bold; color: #1976D2; text-align: center; margin: 16px 0;">12.5 kg</div>
-              <div style="padding: 0 8px; margin-bottom: 8px;">
-                <div style="background-color: #e0e0e0; border-radius: 6px; height: 12px; overflow: hidden;">
-                  <div style="background-color: #1976D2; width: 41.6%; height: 100%; border-radius: 6px;"></div>
+            </q-card>
+
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+              <!-- 예상 무게 (Full Width) -->
+              <q-card flat bordered class="detail-card">
+                <div class="card-title">
+                  <q-icon name="scale" />
+                  <span>예상 무게</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #888; margin-top: 4px;">
-                  <span>0kg</span>
-                  <span>30kg</span>
+                <div style="font-size: 2.5rem; font-weight: bold; color: #1976D2; text-align: center; margin: 16px 0;">12.5 kg</div>
+                <div style="padding: 0 8px; margin-bottom: 8px;">
+                  <div style="background-color: #e0e0e0; border-radius: 6px; height: 12px; overflow: hidden;">
+                    <div style="background-color: #1976D2; width: 41.6%; height: 100%; border-radius: 6px;"></div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #888; margin-top: 4px;">
+                    <span>0kg</span>
+                    <span>30kg</span>
+                  </div>
                 </div>
-              </div>
-            </q-card>
+              </q-card>
 
-            <!-- 추천 캐리어 사이즈 (Full Width) -->
-            <q-card flat bordered class="detail-card">
-              <div class="card-title">
-                <q-icon name="luggage" />
-                <span>캐리어 사이즈 추천</span>
-              </div>
-              <div style="text-align: center; padding: 12px 0;">
-                <div style="font-size: 1.8rem; font-weight: bold; color: #1976D2;">24인치 (중형)</div>
-                <div style="font-size: 0.9rem; color: #888; margin-top: 4px;">예상 무게 12.5kg 기준</div>
-              </div>
-              <q-list dense separator style="border-top: 1px solid #f0f0f0;">
-                <q-item style="padding: 8px 4px;">
-                  <q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">20인치 이하</q-item-section>
-                  <q-item-section style="color: #666;">10kg 미만 (기내용, 1-3박)</q-item-section>
-                </q-item>
-                <q-item style="padding: 8px 4px; background-color: #f8fbff;">
-                  <q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">24인치</q-item-section>
-                  <q-item-section style="color: #666;">10-15kg (위탁용, 3-5박)</q-item-section>
-                </q-item>
-                <q-item style="padding: 8px 4px;">
-                  <q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">28인치 이상</q-item-section>
-                  <q-item-section style="color: #666;">15kg 이상 (위탁용, 장기 여행)</q-item-section>
-                </q-item>
-              </q-list>
-            </q-card>
+              <!-- 추천 캐리어 사이즈 (Full Width) -->
+              <q-card flat bordered class="detail-card">
+                <div class="card-title">
+                  <q-icon name="luggage" />
+                  <span>캐리어 사이즈 추천</span>
+                </div>
+                <div style="text-align: center; padding: 12px 0;">
+                  <div style="font-size: 1.8rem; font-weight: bold; color: #1976D2;">24인치 (중형)</div>
+                  <div style="font-size: 0.9rem; color: #888; margin-top: 4px;">예상 무게 12.5kg 기준</div>
+                </div>
+                <q-list dense separator style="border-top: 1px solid #f0f0f0;">
+                  <q-item style="padding: 8px 4px;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">20인치 이하</q-item-section><q-item-section style="color: #666;">10kg 미만 (기내용, 1-3박)</q-item-section></q-item>
+                  <q-item style="padding: 8px 4px; background-color: #f8fbff;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">24인치</q-item-section><q-item-section style="color: #666;">10-15kg (위탁용, 3-5박)</q-item-section></q-item>
+                  <q-item style="padding: 8px 4px;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">28인치 이상</q-item-section><q-item-section style="color: #666;">15kg 이상 (위탁용, 장기 여행)</q-item-section></q-item>
+                </q-list>
+              </q-card>
 
-            <!-- 물품 분석 -->
-            <q-card flat bordered class="detail-card">
-              <div class="card-title">
-                <q-icon name="checklist" />
-                <span>물품 분석 정보</span>
-              </div>
-              <q-list separator style="margin-top: 8px;">
-                <q-item v-for="item in detectedItems" :key="item.name">
-                  <q-item-section>{{ item.name }}</q-item-section>
-                  <q-item-section side>{{ item.weight }}</q-item-section>
-                </q-item>
-              </q-list>
-            </q-card>
+              <!-- 물품 분석 -->
+              <q-card flat bordered class="detail-card">
+                <div class="card-title">
+                  <q-icon name="checklist" />
+                  <span>물품 분석 정보</span>
+                </div>
+                <q-list separator style="margin-top: 8px;">
+                  <q-item v-for="item in detectedItems" :key="item.name">
+                    <q-item-section>{{ item.name }}</q-item-section>
+                    <q-item-section side>{{ item.weight }}</q-item-section>
+                  </q-item>
+                </q-list>
+              </q-card>
+            </div>
           </div>
         </div>
-
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useAuth } from '~/composables/useAuth';
 
-// Type for season
 type Season = '여름' | '봄/가을' | '겨울';
 
-const selectedSeason = ref<Season>('여름'); // 기본값으로 '여름' 선택
+interface ClassificationHistory {
+  id: number;
+  destination: string | null;
+  analysis_date: string;
+  total_items: number;
+  image_url: string;
+  thumbnail_url: string | null;
+}
 
-// 버튼 스타일을 동적으로 반환하는 함수
-const getButtonStyle = (season: Season) => {
-  const style: { [key: string]: string } = {
-    borderRadius: '16px',
-    transition: 'all 0.3s ease',
-    padding: '4px 16px',
-    border: '1px solid #e0e0e0'
-  };
+const { user } = useAuth();
+const apiBaseUrl = 'http://localhost:5001'; // 백엔드 서버 주소
 
-  if (selectedSeason.value === season) {
-    if (season === '여름') {
-      style.backgroundColor = '#FFEBEE';
-      style.color = '#D32F2F';
-      style.borderColor = '#FFCDD2';
-    } else if (season === '봄/가을') {
-      style.backgroundColor = '#FFF8E1';
-      style.color = '#FFA000';
-      style.borderColor = '#FFECB3';
-    } else { // 겨울
-      style.backgroundColor = '#E1F5FE';
-      style.color = '#0288D1';
-      style.borderColor = '#B3E5FC';
-    }
-  } else {
-    style.backgroundColor = 'white';
-    style.color = '#757575';
+const selectedSeason = ref<Season>('여름');
+const classificationHistory = ref<ClassificationHistory[]>([]);
+const selectedHistory = ref<ClassificationHistory | null>(null);
+const isLoading = ref(true);
+
+const fetchHistory = async () => {
+  if (!user.value) {
+    console.log("사용자 정보가 없어 분석 기록을 가져올 수 없습니다.");
+    isLoading.value = false;
+    return;
   }
-  return style;
+  
+  isLoading.value = true;
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/analysis/history/${user.value.id}`);
+    if (!response.ok) {
+      throw new Error('분석 기록을 가져오는데 실패했습니다.');
+    }
+    const data = await response.json();
+    classificationHistory.value = data.results;
+
+  } catch (error) {
+    console.error(error);
+  } finally {
+    isLoading.value = false;
+  }
 };
 
-// 가상 데이터 (디자인 확인용)
-const classificationHistory = ref([
-  { id: 1, destination: '일본 도쿄', date: '2025-01-15', itemCount: 5 },
-  { id: 2, destination: '부산', date: '2024-12-20', itemCount: 3 },
-  { id: 3, destination: '미국 뉴욕', date: '2024-11-05', itemCount: 8 },
-  { id: 4, destination: '제주도', date: '2024-10-18', itemCount: 4 },
-]);
+onMounted(fetchHistory);
 
 const detectedItems = ref([
   { name: '노트북', weight: '1.5 kg' },
@@ -191,12 +223,19 @@ const detectedItems = ref([
 
 .history-card {
   transition: all 0.2s ease-in-out;
+  border: 1px solid #e3f0fa;
 }
 
 .history-card:hover {
   border-color: #1976D2;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transform: scale(1.03);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.history-card--selected {
+  border-color: #1976D2;
+  box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
+  transform: translateY(-2px);
 }
 
 .detail-card {

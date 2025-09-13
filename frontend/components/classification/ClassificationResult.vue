@@ -751,30 +751,23 @@ onBeforeUpdate(() => {
 });
 
 onMounted(() => {
-  if (route.query.results) {
-    try {
-      const resultData = JSON.parse(route.query.results);
-      detectionResults.value = resultData.results || [];
-      imageId.value = resultData.image_id;
-      originalImageSize.value = resultData.image_size || { width: 1, height: 1 };
-    } catch (e) {
-      console.error("Error parsing results JSON:", e);
-      detectionResults.value = [];
+  const resultsData = route.query.results ? JSON.parse(route.query.results) : null;
+
+  if (resultsData) {
+    detectionResults.value = resultsData.results || [];
+    imageId.value = resultsData.image_id;
+    originalImageSize.value = resultsData.image_size || { width: 1, height: 1 };
+    // 분류 결과에 포함된 실제 이미지 URL을 우선적으로 사용
+    if (resultsData.image_url) {
+      imageUrl.value = resultsData.image_url;
     }
   }
-  if (route.query.image) {
+
+  // 실제 이미지 URL이 없는 경우에만 blob URL을 사용 (폴백)
+  if (!imageUrl.value && route.query.image) {
     imageUrl.value = route.query.image;
-  } else if (route.query.results) {
-    // results 데이터에서 이미지 URL 추출 시도
-    try {
-      const resultData = JSON.parse(route.query.results);
-      if (resultData.image_url) {
-        imageUrl.value = resultData.image_url;
-      }
-    } catch (e) {
-      console.error("Error extracting image URL from results:", e);
-    }
   }
+
   isLoading.value = false;
 
   // 페이드 인 애니메이션
@@ -840,10 +833,11 @@ const saveAnalysisResults = async () => {
         throw new Error('사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.');
     }
 
+    const realImageUrl = JSON.parse(route.query.results)?.image_url || imageUrl.value;
+
     const analysisData = {
       user_id: storedUser.id,
       image_id: imageId.value,
-      image_url: imageUrl.value,
       image_size: originalImageSize.value,
       detected_items: detectionResults.value.map(item => ({
         name_ko: item.name_ko,

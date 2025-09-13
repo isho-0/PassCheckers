@@ -4,6 +4,9 @@ from matching.item_service import item_service
 from models.item_model import ItemModel
 from models.detected_item_model import DetectedItemModel
 from services import gemini_service
+from flask import send_file
+from db.database_utils import get_db_connection
+import io
 
 items_bp = Blueprint('items_bp', __name__, url_prefix='/api/items')
 
@@ -103,8 +106,34 @@ def add_detected_items():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        print(f"[ADD API] Server error: {e}")
+        print(f"[RESULTS API] Server error: {e}")
         return jsonify({"error": "서버 내부 오류가 발생했습니다."}), 500
+
+@items_bp.route('/image/<int:image_id>', methods=['GET'])
+def get_image_by_id(image_id):
+    """ID를 기반으로 원본 이미지 데이터를 반환합니다."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT image_data FROM images WHERE image_id = %s", (image_id,))
+            result = cursor.fetchone()
+            
+            if result and result['image_data']:
+                # image_data (BLOB)를 BytesIO로 감싸서 send_file로 보냅니다.
+                return send_file(
+                    io.BytesIO(result['image_data']),
+                    mimetype='image/jpeg',  # 혹은 저장된 이미지 타입에 맞게 변경
+                    as_attachment=False
+                )
+            else:
+                return jsonify({"error": "이미지를 찾을 수 없습니다."}), 404
+    except Exception as e:
+        print(f"[IMAGE API] Server error: {e}")
+        return jsonify({"error": "이미지 조회 중 오류 발생"}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @items_bp.route('/delete', methods=['POST'])
 def delete_detected_items():
