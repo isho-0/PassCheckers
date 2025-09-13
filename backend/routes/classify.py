@@ -25,6 +25,7 @@ def run_detection(img_bytes, conn, image_id, img_width, img_height):
     yolo_predictions = predict_name_with_yolo(img_bytes, bboxes)
     print(f"[DETECTION] YOLO classified {len(yolo_predictions)} objects")
 
+    """
     # 크롭 이미지 저장 (성능 개선을 위한 중요한 기능)
     if bboxes:
         try:
@@ -33,6 +34,7 @@ def run_detection(img_bytes, conn, image_id, img_width, img_height):
         except Exception as e:
             print(f"[DETECTION WARNING] Failed to save cropped images: {e}")
 
+    """
     enriched_results = []
 
     for i, p in enumerate(yolo_predictions):

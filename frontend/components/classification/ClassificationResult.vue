@@ -29,7 +29,7 @@
               원본 이미지
             </div>
             <q-card flat bordered class="image-card" style="text-align: center; height: 450px; display: flex; align-items: center; justify-content: center;">
-              <div ref="imageContainerRef" class="image-container" style="position: relative; display: inline-block;">
+              <div ref="imageContainerRef" class="image-container" style="position: relative; display: inline-block; width: 100%; height: 100%;">
                 <img 
                   :src="imageUrl" 
                   style="border-radius: 16px; max-width: 100%; max-height: 100%; object-fit: contain;" 
@@ -87,6 +87,8 @@
                 </div>
               </transition>
             </div>
+
+            
 
           </div>
 
