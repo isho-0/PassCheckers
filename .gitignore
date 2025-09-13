@@ -70,3 +70,6 @@ backend/models/pytorch/*.pt
 
 # OS
 Thumbs.db
+
+# result cropped images
+static\results\
