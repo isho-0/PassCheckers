@@ -779,7 +779,17 @@ const saveChanges = async () => {
         }
 
         // 최종 결과로 UI 업데이트
-        detectionResults.value = currentResults;
+        detectionResults.value = currentResults.map(item => {
+          if (item.bbox && originalImageSize.value.width > 1) {
+            const [x_min, y_min, x_max, y_max] = item.bbox;
+            const { width, height } = originalImageSize.value;
+            return {
+              ...item,
+              bbox: [x_min / width, y_min / height, x_max / width, y_max / height]
+            };
+          }
+          return item;
+        });
 
         $q.notify({ message: '성공적으로 저장되었습니다.', color: 'positive', icon: 'check' });
 
