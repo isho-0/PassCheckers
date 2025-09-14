@@ -45,7 +45,7 @@
                     v-for="(item, index) in detectionResults"
                     :key="item.item_id || item.name_ko"
                     :class="['bounding-box', { 'bounding-box--hovered': hoveredIndex === index }]"
-                    :style="calculateBoxStyle(item.bbox, imageContainerRef)"
+                    :style="calculateBoxStyleForMain(item.bbox, imageContainerRef)"
                   >
                     <div class="box-label">{{ item.name_ko }}</div>
                   </div>
@@ -242,83 +242,85 @@
                 <q-btn icon="add" label="물품 추가" flat dense @click="addNewItem" />
               </q-card-section>
               <q-separator />
-              <q-list separator class="col q-pt-none">
-                <q-item 
-                  v-for="(item, index) in itemsInEditor" 
-                  :key="item.item_id || `new-${index}`" 
-                  :class="{ 'bg-grey-3': item.isDeleted, 'item-confirmed': item.isConfirmed }"
-                  @mouseenter="editorHoveredIndex = index"
-                  @mouseleave="editorHoveredIndex = null"
-                >
-                  <q-item-section>
-                    <q-select
-                      :ref="(el) => { if (el) searchSelectRefs[index] = el }"
-                      v-if="item.isNew && !item.isConfirmed"
-                      v-model="item.name_ko"
-                      label="물품명 입력 후 Enter로 검색"
-                      autofocus
-                      dense
-                      use-input
-                      fill-input
-                      hide-selected
-                      :options="autocompleteSuggestions"
-                      @new-value="handleNewValue"
-                      new-value-mode="add-unique"
-                      @keyup.enter="handleEnterKey($event, index)"
-                      @blur="onSelectBlur($event, item)"
-                      @input-value="(val) => item.name_ko = val"
-                      autocomplete="off"
-                    >
-                      <template v-slot:no-option>
-                        <q-item>
-                          <q-item-section class="text-grey">
-                            일치하는 항목이 없습니다.
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-select>
-
-                    <div v-if="item.isNew && item.isConfirmed" class="confirmed-item row items-center no-wrap">
-                      <q-item-label class="col">{{ item.name_ko }}</q-item-label>
-                      <q-btn round dense flat icon="edit" @click="item.isConfirmed = false" class="q-ml-sm">
-                        <q-tooltip>이름 수정</q-tooltip>
-                      </q-btn>
-                    </div>
-
-                    <q-item-label v-else-if="!item.isNew" :class="{ 'text-grey-6': item.isDeleted, 'text-strike': item.isDeleted }">{{ item.name_ko }}</q-item-label>
-                  </q-item-section>
-
-                  <q-item-section side>
-                    <div class="row no-wrap items-center">
-                      <q-btn
+              <q-scroll-area class="col">
+                <q-list separator class="q-pt-none">
+                  <q-item 
+                    v-for="(item, index) in itemsInEditor" 
+                    :key="item.item_id || `new-${index}`" 
+                    :class="{ 'bg-grey-3': item.isDeleted, 'item-confirmed': item.isConfirmed }"
+                    @mouseenter="editorHoveredIndex = index"
+                    @mouseleave="editorHoveredIndex = null"
+                  >
+                    <q-item-section>
+                      <q-select
+                        :ref="(el) => { if (el) searchSelectRefs[index] = el }"
                         v-if="item.isNew && !item.isConfirmed"
-                        round dense flat icon="check"
-                        @click="resolveItem(item)"
-                        :disable="!item.name_ko"
+                        v-model="item.name_ko"
+                        label="물품명 입력 후 Enter로 검색"
+                        autofocus
+                        dense
+                        use-input
+                        fill-input
+                        hide-selected
+                        :options="autocompleteSuggestions"
+                        @new-value="handleNewValue"
+                        new-value-mode="add-unique"
+                        @keyup.enter="handleEnterKey($event, index)"
+                        @blur="onSelectBlur($event, item)"
+                        @input-value="(val) => item.name_ko = val"
+                        autocomplete="off"
                       >
-                        <q-tooltip>항목 확정</q-tooltip>
-                      </q-btn>
-                      <q-btn 
-                        v-if="item.isNew && item.isConfirmed"
-                        :icon="item.bbox ? 'replay' : 'edit_location'"
-                        flat round dense
-                        @click="activateDrawing(index)"
-                        :color="item.bbox ? 'positive' : (activeDrawIndex === index ? 'primary' : 'grey')"
-                        :disable="item.isDeleted"
-                      >
-                        <q-tooltip>{{ item.bbox ? '위치 다시 지정' : '위치 지정' }}</q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        :icon="item.isDeleted ? 'undo' : 'delete'"
-                        flat round dense
-                        @click="toggleDeleteItem(item)"
-                      >
-                        <q-tooltip>{{ item.isDeleted ? '복구' : '삭제' }}</q-tooltip>
-                      </q-btn>
-                    </div>
-                  </q-item-section>
-                </q-item>
-              </q-list>
+                        <template v-slot:no-option>
+                          <q-item>
+                            <q-item-section class="text-grey">
+                              일치하는 항목이 없습니다.
+                            </q-item-section>
+                          </q-item>
+                        </template>
+                      </q-select>
+
+                      <div v-if="item.isNew && item.isConfirmed" class="confirmed-item row items-center no-wrap">
+                        <q-item-label class="col">{{ item.name_ko }}</q-item-label>
+                        <q-btn round dense flat icon="edit" @click="item.isConfirmed = false" class="q-ml-sm">
+                          <q-tooltip>이름 수정</q-tooltip>
+                        </q-btn>
+                      </div>
+
+                      <q-item-label v-else-if="!item.isNew" :class="{ 'text-grey-6': item.isDeleted, 'text-strike': item.isDeleted }">{{ item.name_ko }}</q-item-label>
+                    </q-item-section>
+
+                    <q-item-section side>
+                      <div class="row no-wrap items-center">
+                        <q-btn
+                          v-if="item.isNew && !item.isConfirmed"
+                          round dense flat icon="check"
+                          @click="resolveItem(item)"
+                          :disable="!item.name_ko"
+                        >
+                          <q-tooltip>항목 확정</q-tooltip>
+                        </q-btn>
+                        <q-btn 
+                          v-if="item.isNew && item.isConfirmed"
+                          :icon="item.bbox ? 'replay' : 'edit_location'"
+                          flat round dense
+                          @click="activateDrawing(index)"
+                          :color="item.bbox ? 'positive' : (activeDrawIndex === index ? 'primary' : 'grey')"
+                          :disable="item.isDeleted"
+                        >
+                          <q-tooltip>{{ item.bbox ? '위치 다시 지정' : '위치 지정' }}</q-tooltip>
+                        </q-btn>
+                        <q-btn
+                          :icon="item.isDeleted ? 'undo' : 'delete'"
+                          flat round dense
+                          @click="toggleDeleteItem(item)"
+                        >
+                          <q-tooltip>{{ item.isDeleted ? '복구' : '삭제' }}</q-tooltip>
+                        </q-btn>
+                      </div>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </q-scroll-area>
             </q-card>
           </div>
         </q-card-section>
@@ -392,21 +394,26 @@ const isSaveButtonVisible = ref(true)
 
 
 // BBox 스타일 계산 로직을 공통 함수로 추출
-const calculateBoxStyle = (bbox, containerEl) => {
+const calculateBoxStyleForMain = (bbox, containerEl) => {
   if (!bbox || !containerEl) return { display: 'none' };
 
   const imgEl = containerEl.querySelector('img');
   if (!imgEl) return { display: 'none' };
 
-  // object-fit으로 조정된 이미지의 실제 크기와 위치를 가져옵니다.
+  // Get rendered dimensions of the image
   const displayedWidth = imgEl.clientWidth;
   const displayedHeight = imgEl.clientHeight;
-  const offsetX = imgEl.offsetLeft;
-  const offsetY = imgEl.offsetTop;
+
+  // Get position of image and container relative to viewport
+  const imgRect = imgEl.getBoundingClientRect();
+  const containerRect = containerEl.getBoundingClientRect();
+
+  // Calculate the offset of the image relative to the container
+  const offsetX = imgRect.left - containerRect.left;
+  const offsetY = imgRect.top - containerRect.top;
 
   const [x_min_norm, y_min_norm, x_max_norm, y_max_norm] = bbox;
 
-  // 실제 렌더링된 크기를 기준으로 bbox의 픽셀 값을 계산합니다.
   const left = offsetX + (x_min_norm * displayedWidth);
   const top = offsetY + (y_min_norm * displayedHeight);
   const width = (x_max_norm - x_min_norm) * displayedWidth;
@@ -418,6 +425,33 @@ const calculateBoxStyle = (bbox, containerEl) => {
     top: `${top}px`,
     width: `${width}px`,
     height: `${height}px`,
+  };
+};
+
+
+const calculateBoxStyleForModal = (bbox, containerEl, imageSize) => {
+  if (!bbox || !containerEl) return {};
+  
+  const container = containerEl.getBoundingClientRect();
+  const containerRatio = container.width / container.height;
+  const imageRatio = imageSize.width / imageSize.height;
+
+  let scale = 1, offsetX = 0, offsetY = 0;
+  if (imageRatio > containerRatio) {
+    scale = container.width / imageSize.width;
+    offsetY = (container.height - imageSize.height * scale) / 2;
+  } else {
+    scale = container.height / imageSize.height;
+    offsetX = (container.width - imageSize.width * scale) / 2;
+  }
+
+  const [x_min, y_min, x_max, y_max] = bbox;
+  return {
+    position: 'absolute',
+    left: `${(x_min * imageSize.width * scale) + offsetX}px`,
+    top: `${(y_min * imageSize.height * scale) + offsetY}px`,
+    width: `${((x_max - x_min) * imageSize.width) * scale}px`,
+    height: `${((y_max - y_min) * imageSize.height) * scale}px`,
   };
 };
 
@@ -476,27 +510,29 @@ const handleMouseMove = (e) => {
   drawingRect.value.height = Math.abs(currentY - startY)
 }
 
-const normalizeBbox = (drawnRect, containerEl) => {
+const normalizeBbox = (drawnRect, containerEl, imageSize) => {
   if (!drawnRect || !containerEl) return null;
 
-  const imgEl = containerEl.querySelector('img');
-  if (!imgEl) return null;
+  const container = containerEl.getBoundingClientRect();
+  const containerRatio = container.width / container.height;
+  const imageRatio = imageSize.width / imageSize.height;
 
-  // object-fit으로 조정된 이미지의 실제 크기와 위치를 가져옵니다.
-  const displayedWidth = imgEl.clientWidth;
-  const displayedHeight = imgEl.clientHeight;
-  const offsetX = imgEl.offsetLeft;
-  const offsetY = imgEl.offsetTop;
+  let scale = 1, offsetX = 0, offsetY = 0;
+  if (imageRatio > containerRatio) {
+    scale = container.width / imageSize.width;
+    offsetY = (container.height - imageSize.height * scale) / 2;
+  } else {
+    scale = container.height / imageSize.height;
+    offsetX = (container.width - imageSize.width * scale) / 2;
+  }
 
-  // 드래그한 영역의 픽셀 값을 이미지 내부 좌표로 변환합니다.
   const imgX = drawnRect.x - offsetX;
   const imgY = drawnRect.y - offsetY;
 
-  // 이미지 내부 좌표를 [0, 1] 범위의 정규화된 좌표로 변환합니다.
-  const x_min = imgX / displayedWidth;
-  const y_min = imgY / displayedHeight;
-  const x_max = (imgX + drawnRect.width) / displayedWidth;
-  const y_max = (imgY + drawnRect.height) / displayedHeight;
+  const x_min = (imgX / scale) / imageSize.width;
+  const y_min = (imgY / scale) / imageSize.height;
+  const x_max = ((imgX + drawnRect.width) / scale) / imageSize.width;
+  const y_max = ((imgY + drawnRect.height) / scale) / imageSize.height;
   
   return [
       Math.max(0, Math.min(1, x_min)),
@@ -513,7 +549,7 @@ const handleMouseUp = () => {
   
   const item = itemsInEditor.value[activeDrawIndex.value];
   
-  const normalized = normalizeBbox(drawingRect.value, editorImageContainer.value);
+  const normalized = normalizeBbox(drawingRect.value, editorImageContainer.value, originalImageSize.value);
   if (normalized) {
     item.bbox = normalized;
   }
@@ -524,7 +560,7 @@ const handleMouseUp = () => {
 
 // 수정: 공통 함수를 사용하도록 변경
 const getEditorBoxStyle = (bbox) => {
-  return calculateBoxStyle(bbox, editorImageContainer.value);
+  return calculateBoxStyleForModal(bbox, editorImageContainer.value, originalImageSize.value);
 }
 
 const saveChanges = async () => {
