@@ -129,7 +129,21 @@ class ItemModel:
                 # 새로 추가된 item의 ID 가져오기
                 new_item_id = cursor.lastrowid
                 
-                # 2. weights 테이블에 데이터 추가
+                # 2. weights 테이블 생성 (없을 경우)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS `weights` (
+                      `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                      `item_id` INT NOT NULL UNIQUE,
+                      `weight_range` VARCHAR(255) COLLATE utf8mb4_unicode_ci,
+                      `avg_weight_value` DECIMAL(10, 2),
+                      `avg_weight_unit` VARCHAR(10) COLLATE utf8mb4_unicode_ci,
+                      CONSTRAINT `fk_item_id` FOREIGN KEY (`item_id`) 
+                      REFERENCES `items` (`id`) 
+                      ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                """)
+
+                # 3. weights 테이블에 데이터 추가
                 cursor.execute("""
                     INSERT INTO weights (item_id, weight_range, avg_weight_value, avg_weight_unit)
                     VALUES (%s, %s, %s, %s)
@@ -143,7 +157,7 @@ class ItemModel:
                 # 모든 변경사항을 커밋
                 conn.commit()
                 
-                # 3. 추가된 아이템의 전체 정보를 다시 조회하여 반환
+                # 4. 추가된 아이템의 전체 정보를 다시 조회하여 반환
                 cursor.execute("""
                     SELECT id, item_name, item_name_EN, carry_on_allowed, 
                            checked_baggage_allowed, notes, notes_EN, source
