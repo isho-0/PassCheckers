@@ -171,6 +171,33 @@ def delete_detected_items():
     except Exception as e:
         return jsonify({"error": "서버 내부 오류가 발생했습니다."}), 500
 
+@items_bp.route('/update', methods=['POST'])
+def update_detected_items():
+    """탐지된 아이템의 이름 또는 bbox를 수정합니다."""
+    data = request.get_json()
+    if not data or 'image_id' not in data or 'items_to_update' not in data:
+        return jsonify({"error": "image_id와 items_to_update가 필요합니다."}), 400
+
+    image_id = data['image_id']
+    items_to_update = data['items_to_update']
+
+    try:
+        # 이 부분은 서비스 레이어로 분리하는 것이 더 좋습니다.
+        for item_data in items_to_update:
+            item_service.update_detected_item(
+                item_id=item_data['item_id'],
+                new_name_ko=item_data['name_ko'],
+                new_bbox=item_data.get('bbox')
+            )
+
+        # 모든 작업 후, 상세 정보가 포함된 최신 목록을 가져옵니다.
+        all_detected_items = DetectedItemModel.get_detailed_by_image_id(image_id)
+        return jsonify(all_detected_items), 200
+
+    except Exception as e:
+        print(f"[UPDATE API] Server error: {e}")
+        return jsonify({"error": "아이템 수정 중 서버 오류가 발생했습니다."}), 500
+
 @items_bp.route('/results/<int:image_id>', methods=['GET'])
 def get_results_by_image_id(image_id):
     """특정 이미지 ID에 대한 모든 상세 탐지 결과를 반환합니다."""

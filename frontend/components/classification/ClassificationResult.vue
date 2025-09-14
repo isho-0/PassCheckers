@@ -220,15 +220,16 @@
                   <!-- 현재 그리는 BBox -->
                   <div v-if="isDrawing" class="drawing-rect" :style="drawingRectStyle"></div>
                   <!-- 이미 추가된 BBox들 -->
-                  <div 
-                    v-for="(item, index) in itemsInEditor.filter(i => i.bbox && !i.isDeleted)"
-                    :key="`edit-box-${item.item_id || index}`"
-                    class="drawn-box"
-                    :style="getEditorBoxStyle(item.bbox)"
-                    :class="{ 'drawn-box--hovered': editorHoveredIndex === index }"
-                  >
-                    <div class="box-label">{{ item.name_ko }}</div>
-                  </div>
+                  <template v-for="(item, index) in itemsInEditor" :key="`edit-box-${item.item_id || index}`">
+                    <div 
+                      v-if="item.bbox && !item.isDeleted && !item.isDrawingBbox"
+                      class="drawn-box"
+                      :style="getEditorBoxStyle(item.bbox)"
+                      :class="{ 'drawn-box--hovered': editorHoveredIndex === index }"
+                    >
+                      <div class="box-label">{{ item.name_ko }}</div>
+                    </div>
+                  </template>
                 </div>
               </div>
             </q-card>
@@ -248,74 +249,103 @@
                     v-for="(item, index) in itemsInEditor" 
                     :key="item.item_id || `new-${index}`" 
                     :class="{ 'bg-grey-3': item.isDeleted, 'item-confirmed': item.isConfirmed }"
+                    :style="{ opacity: item.isDeleted ? 0.6 : 1 }"
                     @mouseenter="editorHoveredIndex = index"
                     @mouseleave="editorHoveredIndex = null"
                   >
                     <q-item-section>
+                      <!-- 이름 입력 UI (신규 또는 수정 시) -->
                       <q-select
                         :ref="(el) => { if (el) searchSelectRefs[index] = el }"
-                        v-if="item.isNew && !item.isConfirmed"
+                        v-if="(item.isNew && !item.isConfirmed) || item.isEditing"
                         v-model="item.name_ko"
-                        label="물품명 입력 후 Enter로 검색"
-                        autofocus
-                        dense
-                        use-input
-                        fill-input
-                        hide-selected
+                        :label="item.isNew ? '물품명 입력 후 Enter' : '물품명 수정 후 Enter'"
+                        autofocus dense use-input fill-input hide-selected
                         :options="autocompleteSuggestions"
                         @new-value="handleNewValue"
                         new-value-mode="add-unique"
                         @keyup.enter="handleEnterKey($event, index)"
-                        @blur="onSelectBlur($event, item)"
                         @input-value="(val) => item.name_ko = val"
                         autocomplete="off"
                       >
                         <template v-slot:no-option>
-                          <q-item>
-                            <q-item-section class="text-grey">
-                              일치하는 항목이 없습니다.
-                            </q-item-section>
-                          </q-item>
+                          <q-item><q-item-section class="text-grey">일치하는 항목이 없습니다.</q-item-section></q-item>
                         </template>
                       </q-select>
 
-                      <div v-if="item.isNew && item.isConfirmed" class="confirmed-item row items-center no-wrap">
-                        <q-item-label class="col">{{ item.name_ko }}</q-item-label>
-                        <q-btn round dense flat icon="edit" @click="item.isConfirmed = false" class="q-ml-sm">
-                          <q-tooltip>이름 수정</q-tooltip>
-                        </q-btn>
-                      </div>
-
-                      <q-item-label v-else-if="!item.isNew" :class="{ 'text-grey-6': item.isDeleted, 'text-strike': item.isDeleted }">{{ item.name_ko }}</q-item-label>
+                      <!-- 이름 텍스트 (확정 또는 기본 상태 시) -->
+                      <q-item-label v-if="!((item.isNew && !item.isConfirmed) || item.isEditing)" :class="{ 'text-grey-6': item.isDeleted, 'text-strike': item.isDeleted }">
+                        {{ item.name_ko }}
+                      </q-item-label>
                     </q-item-section>
 
                     <q-item-section side>
                       <div class="row no-wrap items-center">
-                        <q-btn
-                          v-if="item.isNew && !item.isConfirmed"
-                          round dense flat icon="check"
-                          @click="resolveItem(item)"
-                          :disable="!item.name_ko"
-                        >
-                          <q-tooltip>항목 확정</q-tooltip>
-                        </q-btn>
-                        <q-btn 
-                          v-if="item.isNew && item.isConfirmed"
-                          :icon="item.bbox ? 'replay' : 'edit_location'"
-                          flat round dense
-                          @click="activateDrawing(index)"
-                          :color="item.bbox ? 'positive' : (activeDrawIndex === index ? 'primary' : 'grey')"
-                          :disable="item.isDeleted"
-                        >
-                          <q-tooltip>{{ item.bbox ? '위치 다시 지정' : '위치 지정' }}</q-tooltip>
-                        </q-btn>
-                        <q-btn
-                          :icon="item.isDeleted ? 'undo' : 'delete'"
-                          flat round dense
-                          @click="toggleDeleteItem(item)"
-                        >
-                          <q-tooltip>{{ item.isDeleted ? '복구' : '삭제' }}</q-tooltip>
-                        </q-btn>
+
+                        <!-- For NEW items -->
+                        <template v-if="item.isNew">
+                          <q-btn
+                            v-if="!item.isConfirmed"
+                            icon="check_circle" flat round dense no-ripple
+                            @click="resolveItem(item)"
+                            :disable="!item.name_ko"
+                            class="action-btn action-btn--confirm"
+                          ><q-tooltip>항목 확정</q-tooltip></q-btn>
+                          
+                          <q-btn
+                            v-if="item.isConfirmed && !item.isDeleted"
+                            :icon="item.bbox ? 'replay' : 'edit_location'"
+                            flat round dense no-ripple
+                            @click="startRedrawBbox(item, index)"
+                            :color="item.bbox ? 'positive' : (activeDrawIndex === index ? 'primary' : 'grey')"
+                          ><q-tooltip>{{ item.bbox ? '위치 다시 지정' : '위치 지정' }}</q-tooltip></q-btn>
+
+                          <q-btn
+                            v-if="!item.isDeleted"
+                            icon="delete" flat round dense no-ripple
+                            @click="toggleDeleteItem(item)"
+                            class="action-btn action-btn--delete"
+                          ><q-tooltip>삭제</q-tooltip></q-btn>
+                        </template>
+
+                        <!-- For EXISTING items -->
+                        <template v-if="!item.isNew">
+                          <!-- EDITING state -->
+                          <template v-if="item.isEditing">
+                            <q-btn
+                              icon="check_circle" flat round dense no-ripple
+                              @click="confirmItemEdit(item)"
+                              class="action-btn action-btn--confirm"
+                            ><q-tooltip>항목 확정</q-tooltip></q-btn>
+                            <q-btn
+                              icon="cancel" flat round dense no-ripple
+                              @click="toggleEditMode(item)"
+                              class="action-btn action-btn--cancel"
+                            ><q-tooltip>수정 취소</q-tooltip></q-btn>
+                            <q-btn
+                              icon="edit_location" flat round dense no-ripple
+                              @click="startRedrawBbox(item, index)"
+                              class="action-btn action-btn--location"
+                            ><q-tooltip>위치 다시 지정</q-tooltip></q-btn>
+                          </template>
+                          <!-- NORMAL state -->
+                          <template v-else>
+                            <q-btn
+                              v-if="!item.isDeleted"
+                              icon="edit" flat round dense no-ripple
+                              @click="toggleEditMode(item)"
+                              class="action-btn action-btn--edit"
+                            ><q-tooltip>물품 수정</q-tooltip></q-btn>
+                          </template>
+
+                          <!-- Delete/Restore button (always visible for existing items) -->
+                          <q-btn
+                            :icon="item.isDeleted ? 'undo' : 'delete'" flat round dense no-ripple
+                            @click="toggleDeleteItem(item)"
+                            :class="item.isDeleted ? 'action-btn action-btn--undo' : 'action-btn action-btn--delete'"
+                          ><q-tooltip>{{ item.isDeleted ? '복구' : '삭제' }}</q-tooltip></q-btn>
+                        </template>
+
                       </div>
                     </q-item-section>
                   </q-item>
@@ -464,17 +494,49 @@ const drawingRectStyle = computed(() => ({
 }))
 
 const openEditModal = () => {
-  itemsInEditor.value = JSON.parse(JSON.stringify(detectionResults.value)).map(item => ({ ...item, isDeleted: false }))
+  itemsInEditor.value = JSON.parse(JSON.stringify(detectionResults.value)).map(item => ({ 
+    ...item, 
+    isDeleted: false, 
+    isEditing: false, 
+    isDrawingBbox: false, // Bbox 그리기 상태 추가
+    originalName: item.name_ko
+  }))
   showEditModal.value = true
 }
 
 const addNewItem = () => {
   if (itemsInEditor.value.some(item => item.isNew && !item.isConfirmed)) return;
-  itemsInEditor.value.unshift({ isNew: true, name_ko: '', bbox: null, isDeleted: false, isConfirmed: false });
+  itemsInEditor.value.unshift({ isNew: true, name_ko: '', bbox: null, isDeleted: false, isConfirmed: false, isEditing: false, isDrawingBbox: false });
 }
 
 const toggleDeleteItem = (item) => {
   item.isDeleted = !item.isDeleted
+}
+
+const toggleEditMode = (item) => {
+  item.isEditing = !item.isEditing;
+  // 수정 취소 시, 원래 이름으로 복원
+  if (!item.isEditing) {
+    item.name_ko = item.originalName;
+  }
+}
+
+const confirmItemEdit = (item) => {
+  if (!item.name_ko) {
+    $q.notify({ message: '물품명을 입력하거나 선택해주세요.', color: 'warning' });
+    return;
+  }
+  item.isEditing = false;
+  item.originalName = item.name_ko; // 수정된 이름을 새로운 원본 이름으로 저장
+}
+
+const startRedrawBbox = (item, index) => {
+  item.isDrawingBbox = true;
+  item.bbox = null; // 이전 bbox를 즉시 제거
+  // 이전 bbox가 사라지는 DOM 업데이트를 기다린 후 그리기 모드 활성화
+  nextTick(() => {
+    activateDrawing(index);
+  });
 }
 
 const activateDrawing = (index) => {
@@ -542,7 +604,6 @@ const normalizeBbox = (drawnRect, containerEl, imageSize) => {
   ];
 }
 
-// BBox 좌표 저장 로직 수정
 const handleMouseUp = () => {
   if (!isDrawing.value || activeDrawIndex.value === null) return;
   isDrawing.value = false;
@@ -554,6 +615,10 @@ const handleMouseUp = () => {
     item.bbox = normalized;
   }
 
+  // 그리기 상태 종료
+  if (item) {
+    item.isDrawingBbox = false;
+  }
   activeDrawIndex.value = null;
   drawingRect.value = { x: 0, y: 0, width: 0, height: 0 };
 };
@@ -570,15 +635,43 @@ const saveChanges = async () => {
     try {
         const itemsToAdd = itemsInEditor.value.filter(item => item.isNew && item.isConfirmed && !item.isDeleted && item.name_ko && item.bbox);
         const itemsToDelete = itemsInEditor.value.filter(item => !item.isNew && item.isDeleted);
+        const itemsToUpdate = itemsInEditor.value.filter(item => 
+          !item.isNew && 
+          !item.isDeleted && 
+          (item.name_ko !== item.originalName || JSON.stringify(item.bbox) !== JSON.stringify(detectionResults.value.find(d => d.item_id === item.item_id)?.bbox))
+        );
 
-        if (itemsToAdd.length === 0 && itemsToDelete.length === 0) {
+        if (itemsToAdd.length === 0 && itemsToDelete.length === 0 && itemsToUpdate.length === 0) {
             $q.notify({ message: '변경 사항이 없습니다.', color: 'info' });
             return;
         }
 
         let currentResults = [...detectionResults.value];
 
-        // 1. 삭제 API 순차적 호출
+        // 1. Update API 호출 (가장 먼저 처리)
+        if (itemsToUpdate.length > 0) {
+            const updatePayload = {
+                image_id: imageId.value,
+                items_to_update: itemsToUpdate.map(item => ({
+                    item_id: item.item_id,
+                    name_ko: item.name_ko,
+                    bbox: item.bbox
+                }))
+            };
+            const response = await fetch('http://' + window.location.hostname + ':5001/api/items/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatePayload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || '수정 중 오류가 발생했습니다.');
+            }
+            currentResults = await response.json();
+        }
+
+        // 2. 삭제 API 순차적 호출
         if (itemsToDelete.length > 0) {
             const deletePayload = {
                 image_id: imageId.value,
@@ -597,7 +690,7 @@ const saveChanges = async () => {
             currentResults = await response.json();
         }
 
-        // 2. 추가 API 순차적 호출
+        // 3. 추가 API 순차적 호출
         if (itemsToAdd.length > 0) {
             const addPayload = {
                 image_id: imageId.value,
@@ -616,7 +709,7 @@ const saveChanges = async () => {
             currentResults = await response.json();
         }
 
-        // 3. 최종 결과로 UI 업데이트
+        // 최종 결과로 UI 업데이트
         detectionResults.value = currentResults;
 
         $q.notify({ message: '성공적으로 저장되었습니다.', color: 'positive', icon: 'check' });
@@ -976,5 +1069,95 @@ onUnmounted(() => {
   font-size: 0.7rem;
   width: 35px;
   text-align: center;
+}
+
+.control-btn--confirm:hover {
+  background-color: rgba(46, 125, 50, 0.1);
+  color: #2e7d32;
+}
+.control-btn--edit:hover {
+  background-color: rgba(25, 118, 210, 0.1);
+  color: #1976d2;
+}
+.control-btn--delete:hover {
+  background-color: rgba(211, 47, 47, 0.1);
+  color: #d32f2f;
+}
+.control-btn--undo:hover {
+  background-color: rgba(2, 136, 209, 0.1);
+  color: #0288d1;
+}
+
+/* Action Button Styles in Modal */
+.action-btn {
+  position: relative;
+  overflow: hidden;
+  transition: color 0.3s;
+  padding: 6px 12px !important;
+  min-height: auto !important;
+  height: auto !important;
+  border-radius: 4px !important;
+}
+
+.action-btn::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0; top: 100%;
+  transition: top 0.2s cubic-bezier(0.4,0,0.2,1);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.action-btn:hover::after {
+  top: 0;
+}
+
+.action-btn .q-btn__content {
+  position: relative;
+  z-index: 2;
+}
+
+/* Edit & Location */
+.action-btn--edit, .action-btn--location {
+  color: #1976d2;
+}
+.action-btn--edit:hover, .action-btn--location:hover {
+  color: white !important;
+}
+.action-btn--edit::after, .action-btn--location::after {
+  background: #1976d2;
+}
+
+/* Confirm */
+.action-btn--confirm {
+  color: #2e7d32;
+}
+.action-btn--confirm:hover {
+  color: white !important;
+}
+.action-btn--confirm::after {
+  background: #2e7d32;
+}
+
+/* Cancel & Delete */
+.action-btn--cancel, .action-btn--delete {
+  color: #d32f2f;
+}
+.action-btn--cancel:hover, .action-btn--delete:hover {
+  color: white !important;
+}
+.action-btn--cancel::after, .action-btn--delete::after {
+  background: #d32f2f;
+}
+
+/* Undo */
+.action-btn--undo {
+  color: #ed6c02;
+}
+.action-btn--undo:hover {
+  color: white !important;
+}
+.action-btn--undo::after {
+  background: #ed6c02;
 }
 </style>

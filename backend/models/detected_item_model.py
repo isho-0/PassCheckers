@@ -140,6 +140,69 @@ class DetectedItemModel:
                 return detailed_items
         finally:
             conn.close()
+
+    @staticmethod
+    def get_by_id(item_id):
+        """ID로 특정 탐지 아이템을 조회합니다."""
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT item_id, image_id, item_name_EN, item_name,
+                           bbox_x_min, bbox_y_min, bbox_x_max, bbox_y_max, packing_info
+                    FROM detected_items 
+                    WHERE item_id = %s
+                """, (item_id,))
+                # bbox 값을 리스트로 변환하여 반환
+                result = cursor.fetchone()
+                if result:
+                    result['bbox'] = [result['bbox_x_min'], result['bbox_y_min'], result['bbox_x_max'], result['bbox_y_max']]
+                return result
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_details(item_id, updates):
+        """특정 탐지 아이템의 정보를 업데이트합니다."""
+        if not updates:
+            return 0
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                set_clauses = []
+                values = []
+
+                # bbox는 4개의 컬럼으로 분리하여 처리
+                if 'bbox' in updates:
+                    bbox = updates.pop('bbox')
+                    if bbox and len(bbox) == 4:
+                        set_clauses.extend([
+                            "bbox_x_min = %s",
+                            "bbox_y_min = %s",
+                            "bbox_x_max = %s",
+                            "bbox_y_max = %s"
+                        ])
+                        values.extend(bbox)
+                
+                # 나머지 필드 처리
+                for key, value in updates.items():
+                    # 모델 필드와 DB 컬럼 이름이 다른 경우를 처리 (예: name_ko -> item_name)
+                    db_key = 'item_name' if key == 'name_ko' else key
+                    set_clauses.append(f"{db_key} = %s")
+                    values.append(value)
+
+                if not set_clauses:
+                    return 0
+
+                sql = f"""UPDATE detected_items SET {', '.join(set_clauses)} WHERE item_id = %s"""
+                values.append(item_id)
+                
+                cursor.execute(sql, tuple(values))
+                conn.commit()
+                return cursor.rowcount
+        finally:
+            conn.close()
     
     @staticmethod
     def to_dict(detected_item):
