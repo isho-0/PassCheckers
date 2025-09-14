@@ -76,28 +76,43 @@ def add_detected_items():
                 print(f"[ADD API] Item '{item_name_ko}' not found in DB and no high-score match. Calling Gemini...")
                 gemini_data = gemini_service.get_item_info_from_gemini(item_name_ko)
                 
-                if gemini_data:
+                if gemini_data and 'item_data' in gemini_data and 'weight_data' in gemini_data:
                     print(f"[ADD API] Gemini returned data for '{item_name_ko}'. Adding to ItemModel...")
-                    item_details = ItemModel.add_item_from_api(gemini_data)
+                    # Gemini로부터 받은 중첩된 데이터를 각 부분으로 분리합니다.
+                    item_data_from_gemini = gemini_data['item_data']
+                    weight_data_from_gemini = gemini_data['weight_data']
+                    
+                    # add_item_from_api가 올바른 데이터를 받도록 수정하고, 반환된 상세 정보를 item_details에 저장합니다.
+                    item_details = ItemModel.add_item_from_api(item_data_from_gemini, weight_data_from_gemini)
                 else:
-                    print(f"[ADD API] Gemini could not provide data for '{item_name_ko}'. Skipping.")
+                    print(f"[ADD API] Gemini could not provide valid data for '{item_name_ko}'. Skipping.")
                     continue
 
+            # item_details가 딕셔너리 형태인지 확인하고 packing_info를 설정합니다.
             packing_info = 'none'
-            if item_details['carry_on_allowed'] == '예' and item_details['checked_baggage_allowed'] == '예':
-                packing_info = 'both'
-            elif item_details['carry_on_allowed'] == '예':
-                packing_info = 'carry_on'
-            elif item_details['checked_baggage_allowed'] == '예':
-                packing_info = 'checked'
-
-            DetectedItemModel.add_item(
-                image_id=image_id,
-                item_name=item_name_ko,
-                bbox=item_data['bbox'],
-                item_name_EN=item_details['item_name_EN'],
-                packing_info=packing_info
-            )
+            if isinstance(item_details, dict):
+                carry_on = item_details.get('carry_on_allowed', '아니요')
+                checked = item_details.get('checked_baggage_allowed', '아니요')
+                
+                if carry_on.startswith('예') and checked.startswith('예'):
+                    packing_info = 'both'
+                elif carry_on.startswith('예'):
+                    packing_info = 'carry_on'
+                elif checked.startswith('예'):
+                    packing_info = 'checked'
+            
+                # DetectedItemModel.add_item을 호출할 때, item_details에서 직접 값을 가져옵니다.
+                DetectedItemModel.add_item(
+                    image_id=image_id,
+                    item_name=item_name_ko,
+                    bbox=item_data['bbox'],
+                    item_name_EN=item_details.get('item_name_EN', ''),
+                    packing_info=packing_info
+                )
+            else:
+                # item_details가 예상치 못한 형식일 경우를 대비한 로깅
+                print(f"[ADD API] Failed to get valid details for '{item_name_ko}'. Skipping DetectedItemModel.add_item.")
+                continue
 
         # 모든 작업 후, 상세 정보가 포함된 최신 목록을 가져옵니다.
         all_detected_items = DetectedItemModel.get_detailed_by_image_id(image_id)

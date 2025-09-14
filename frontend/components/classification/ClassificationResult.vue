@@ -45,7 +45,7 @@
                     v-for="(item, index) in detectionResults"
                     :key="item.item_id || item.name_ko"
                     :class="['bounding-box', { 'bounding-box--hovered': hoveredIndex === index }]"
-                    :style="calculateBoxStyle(item.bbox, imageContainerRef, originalImageSize)"
+                    :style="calculateBoxStyle(item.bbox, imageContainerRef)"
                   >
                     <div class="box-label">{{ item.name_ko }}</div>
                   </div>
@@ -392,29 +392,32 @@ const isSaveButtonVisible = ref(true)
 
 
 // BBox 스타일 계산 로직을 공통 함수로 추출
-const calculateBoxStyle = (bbox, containerEl, imageSize) => {
-  if (!bbox || !containerEl) return {};
-  
-  const container = containerEl.getBoundingClientRect();
-  const containerRatio = container.width / container.height;
-  const imageRatio = imageSize.width / imageSize.height;
+const calculateBoxStyle = (bbox, containerEl) => {
+  if (!bbox || !containerEl) return { display: 'none' };
 
-  let scale = 1, offsetX = 0, offsetY = 0;
-  if (imageRatio > containerRatio) {
-    scale = container.width / imageSize.width;
-    offsetY = (container.height - imageSize.height * scale) / 2;
-  } else {
-    scale = container.height / imageSize.height;
-    offsetX = (container.width - imageSize.width * scale) / 2;
-  }
+  const imgEl = containerEl.querySelector('img');
+  if (!imgEl) return { display: 'none' };
 
-  const [x_min, y_min, x_max, y_max] = bbox;
+  // object-fit으로 조정된 이미지의 실제 크기와 위치를 가져옵니다.
+  const displayedWidth = imgEl.clientWidth;
+  const displayedHeight = imgEl.clientHeight;
+  const offsetX = imgEl.offsetLeft;
+  const offsetY = imgEl.offsetTop;
+
+  const [x_min_norm, y_min_norm, x_max_norm, y_max_norm] = bbox;
+
+  // 실제 렌더링된 크기를 기준으로 bbox의 픽셀 값을 계산합니다.
+  const left = offsetX + (x_min_norm * displayedWidth);
+  const top = offsetY + (y_min_norm * displayedHeight);
+  const width = (x_max_norm - x_min_norm) * displayedWidth;
+  const height = (y_max_norm - y_min_norm) * displayedHeight;
+
   return {
     position: 'absolute',
-    left: `${(x_min * imageSize.width * scale) + offsetX}px`,
-    top: `${(y_min * imageSize.height * scale) + offsetY}px`,
-    width: `${((x_max - x_min) * imageSize.width) * scale}px`,
-    height: `${((y_max - y_min) * imageSize.height) * scale}px`,
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
   };
 };
 
@@ -473,30 +476,27 @@ const handleMouseMove = (e) => {
   drawingRect.value.height = Math.abs(currentY - startY)
 }
 
-// 그려진 BBox를 정규화된 좌표로 변환하는 함수
-const normalizeBbox = (drawnRect, containerEl, imageSize) => {
+const normalizeBbox = (drawnRect, containerEl) => {
   if (!drawnRect || !containerEl) return null;
 
-  const container = containerEl.getBoundingClientRect();
-  const containerRatio = container.width / container.height;
-  const imageRatio = imageSize.width / imageSize.height;
+  const imgEl = containerEl.querySelector('img');
+  if (!imgEl) return null;
 
-  let scale = 1, offsetX = 0, offsetY = 0;
-  if (imageRatio > containerRatio) {
-    scale = container.width / imageSize.width;
-    offsetY = (container.height - imageSize.height * scale) / 2;
-  } else {
-    scale = container.height / imageSize.height;
-    offsetX = (container.width - imageSize.width * scale) / 2;
-  }
+  // object-fit으로 조정된 이미지의 실제 크기와 위치를 가져옵니다.
+  const displayedWidth = imgEl.clientWidth;
+  const displayedHeight = imgEl.clientHeight;
+  const offsetX = imgEl.offsetLeft;
+  const offsetY = imgEl.offsetTop;
 
+  // 드래그한 영역의 픽셀 값을 이미지 내부 좌표로 변환합니다.
   const imgX = drawnRect.x - offsetX;
   const imgY = drawnRect.y - offsetY;
 
-  const x_min = (imgX / scale) / imageSize.width;
-  const y_min = (imgY / scale) / imageSize.height;
-  const x_max = ((imgX + drawnRect.width) / scale) / imageSize.width;
-  const y_max = ((imgY + drawnRect.height) / scale) / imageSize.height;
+  // 이미지 내부 좌표를 [0, 1] 범위의 정규화된 좌표로 변환합니다.
+  const x_min = imgX / displayedWidth;
+  const y_min = imgY / displayedHeight;
+  const x_max = (imgX + drawnRect.width) / displayedWidth;
+  const y_max = (imgY + drawnRect.height) / displayedHeight;
   
   return [
       Math.max(0, Math.min(1, x_min)),
@@ -513,7 +513,7 @@ const handleMouseUp = () => {
   
   const item = itemsInEditor.value[activeDrawIndex.value];
   
-  const normalized = normalizeBbox(drawingRect.value, editorImageContainer.value, originalImageSize.value);
+  const normalized = normalizeBbox(drawingRect.value, editorImageContainer.value);
   if (normalized) {
     item.bbox = normalized;
   }
@@ -524,7 +524,7 @@ const handleMouseUp = () => {
 
 // 수정: 공통 함수를 사용하도록 변경
 const getEditorBoxStyle = (bbox) => {
-  return calculateBoxStyle(bbox, editorImageContainer.value, originalImageSize.value);
+  return calculateBoxStyle(bbox, editorImageContainer.value);
 }
 
 const saveChanges = async () => {
