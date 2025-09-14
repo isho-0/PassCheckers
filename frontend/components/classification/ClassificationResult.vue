@@ -290,7 +290,9 @@
                             @click="resolveItem(item)"
                             :disable="!item.name_ko"
                             class="action-btn action-btn--confirm"
-                          ><q-tooltip>항목 확정</q-tooltip></q-btn>
+                          >
+                            <q-tooltip>항목 확정</q-tooltip>
+                          </q-btn>
                           
                           <q-btn
                             v-if="item.isConfirmed && !item.isDeleted"
@@ -298,14 +300,18 @@
                             flat round dense no-ripple
                             @click="startRedrawBbox(item, index)"
                             :color="item.bbox ? 'positive' : (activeDrawIndex === index ? 'primary' : 'grey')"
-                          ><q-tooltip>{{ item.bbox ? '위치 다시 지정' : '위치 지정' }}</q-tooltip></q-btn>
+                          >
+                            <q-tooltip>{{ item.bbox ? '위치 다시 지정' : '위치 지정' }}</q-tooltip>
+                          </q-btn>
 
                           <q-btn
                             v-if="!item.isDeleted"
                             icon="delete" flat round dense no-ripple
                             @click="toggleDeleteItem(item)"
                             class="action-btn action-btn--delete"
-                          ><q-tooltip>삭제</q-tooltip></q-btn>
+                          >
+                            <q-tooltip>삭제</q-tooltip>
+                          </q-btn>
                         </template>
 
                         <!-- For EXISTING items -->
@@ -316,17 +322,23 @@
                               icon="check_circle" flat round dense no-ripple
                               @click="confirmItemEdit(item)"
                               class="action-btn action-btn--confirm"
-                            ><q-tooltip>항목 확정</q-tooltip></q-btn>
+                            >
+                              <q-tooltip>항목 확정</q-tooltip>
+                            </q-btn>
                             <q-btn
                               icon="cancel" flat round dense no-ripple
                               @click="toggleEditMode(item)"
                               class="action-btn action-btn--cancel"
-                            ><q-tooltip>수정 취소</q-tooltip></q-btn>
+                            >
+                              <q-tooltip>수정 취소</q-tooltip>
+                            </q-btn>
                             <q-btn
                               icon="edit_location" flat round dense no-ripple
                               @click="startRedrawBbox(item, index)"
                               class="action-btn action-btn--location"
-                            ><q-tooltip>위치 다시 지정</q-tooltip></q-btn>
+                            >
+                              <q-tooltip>위치 다시 지정</q-tooltip>
+                            </q-btn>
                           </template>
                           <!-- NORMAL state -->
                           <template v-else>
@@ -335,7 +347,9 @@
                               icon="edit" flat round dense no-ripple
                               @click="toggleEditMode(item)"
                               class="action-btn action-btn--edit"
-                            ><q-tooltip>물품 수정</q-tooltip></q-btn>
+                            >
+                              <q-tooltip>물품 수정</q-tooltip>
+                            </q-btn>
                           </template>
 
                           <!-- Delete/Restore button (always visible for existing items) -->
@@ -343,7 +357,9 @@
                             :icon="item.isDeleted ? 'undo' : 'delete'" flat round dense no-ripple
                             @click="toggleDeleteItem(item)"
                             :class="item.isDeleted ? 'action-btn action-btn--undo' : 'action-btn action-btn--delete'"
-                          ><q-tooltip>{{ item.isDeleted ? '복구' : '삭제' }}</q-tooltip></q-btn>
+                          >
+                            <q-tooltip>{{ item.isDeleted ? '복구' : '삭제' }}</q-tooltip>
+                          </q-btn>
                         </template>
 
                       </div>
@@ -460,22 +476,28 @@ const calculateBoxStyleForMain = (bbox, containerEl) => {
 
 
 const calculateBoxStyleForModal = (bbox, containerEl, imageSize) => {
-  if (!bbox || !containerEl) return {};
-  
-  const container = containerEl.getBoundingClientRect();
-  const containerRatio = container.width / container.height;
-  const imageRatio = imageSize.width / imageSize.height;
+  if (!bbox || !containerEl || !imageSize || imageSize.width === 1) return {};
 
-  let scale = 1, offsetX = 0, offsetY = 0;
+  const containerRect = containerEl.getBoundingClientRect();
+  if (containerRect.width === 0) return {};
+
+  const imageRatio = imageSize.width / imageSize.height;
+  const containerRatio = containerRect.width / containerRect.height;
+
+  let scale = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+
   if (imageRatio > containerRatio) {
-    scale = container.width / imageSize.width;
-    offsetY = (container.height - imageSize.height * scale) / 2;
+    scale = containerRect.width / imageSize.width;
+    offsetY = (containerRect.height - (imageSize.height * scale)) / 2;
   } else {
-    scale = container.height / imageSize.height;
-    offsetX = (container.width - imageSize.width * scale) / 2;
+    scale = containerRect.height / imageSize.height;
+    offsetX = (containerRect.width - (imageSize.width * scale)) / 2;
   }
 
   const [x_min, y_min, x_max, y_max] = bbox;
+
   return {
     position: 'absolute',
     left: `${(x_min * imageSize.width * scale) + offsetX}px`,
@@ -493,15 +515,41 @@ const drawingRectStyle = computed(() => ({
   height: `${drawingRect.value.height}px`,
 }))
 
-const openEditModal = () => {
-  itemsInEditor.value = JSON.parse(JSON.stringify(detectionResults.value)).map(item => ({ 
-    ...item, 
-    isDeleted: false, 
-    isEditing: false, 
-    isDrawingBbox: false, // Bbox 그리기 상태 추가
-    originalName: item.name_ko
-  }))
-  showEditModal.value = true
+const openEditModal = async () => {
+  try {
+    const response = await fetch(`http://${window.location.hostname}:5001/api/items/results/${imageId.value}`);
+    if (!response.ok) {
+      throw new Error('최신 물품 정보를 불러오는 데 실패했습니다.');
+    }
+    const latestResultsWithAbsoluteBbox = await response.json();
+
+    const normalizedResults = latestResultsWithAbsoluteBbox.map(item => {
+      if (item.bbox && originalImageSize.value.width > 1) {
+        const [x_min, y_min, x_max, y_max] = item.bbox;
+        const { width, height } = originalImageSize.value;
+        return {
+          ...item,
+          bbox: [x_min / width, y_min / height, x_max / width, y_max / height]
+        };
+      }
+      return item;
+    });
+
+    detectionResults.value = normalizedResults;
+
+    itemsInEditor.value = JSON.parse(JSON.stringify(normalizedResults)).map(item => ({ 
+      ...item, 
+      isDeleted: false, 
+      isEditing: false, 
+      isDrawingBbox: false, 
+      originalName: item.name_ko
+    }));
+    showEditModal.value = true;
+
+  } catch (error) {
+    console.error('Error opening edit modal:', error);
+    $q.notify({ type: 'negative', message: error.message || '오류가 발생했습니다.' });
+  }
 }
 
 const addNewItem = () => {
@@ -652,12 +700,22 @@ const saveChanges = async () => {
         if (itemsToUpdate.length > 0) {
             const updatePayload = {
                 image_id: imageId.value,
-                items_to_update: itemsToUpdate.map(item => ({
-                    item_id: item.item_id,
-                    name_ko: item.name_ko,
-                    bbox: item.bbox
-                }))
+                items_to_update: itemsToUpdate.map(item => {
+                    const denormalizedBbox = item.bbox ? [
+                        item.bbox[0] * originalImageSize.value.width,
+                        item.bbox[1] * originalImageSize.value.height,
+                        item.bbox[2] * originalImageSize.value.width,
+                        item.bbox[3] * originalImageSize.value.height
+                    ] : null;
+
+                    return {
+                        item_id: item.item_id,
+                        name_ko: item.name_ko,
+                        bbox: denormalizedBbox
+                    };
+                })
             };
+
             const response = await fetch('http://' + window.location.hostname + ':5001/api/items/update', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -694,7 +752,18 @@ const saveChanges = async () => {
         if (itemsToAdd.length > 0) {
             const addPayload = {
                 image_id: imageId.value,
-                new_items: itemsToAdd.map(item => ({ name_ko: item.name_ko, bbox: item.bbox }))
+                new_items: itemsToAdd.map(item => {
+                    const denormalizedBbox = item.bbox ? [
+                        item.bbox[0] * originalImageSize.value.width,
+                        item.bbox[1] * originalImageSize.value.height,
+                        item.bbox[2] * originalImageSize.value.width,
+                        item.bbox[3] * originalImageSize.value.height
+                    ] : null;
+                    return {
+                        name_ko: item.name_ko,
+                        bbox: denormalizedBbox
+                    };
+                })
             };
             const response = await fetch('http://' + window.location.hostname + ':5001/api/items/add', {
                 method: 'POST',

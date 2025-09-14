@@ -175,6 +175,7 @@ def delete_detected_items():
 def update_detected_items():
     """탐지된 아이템의 이름 또는 bbox를 수정합니다."""
     data = request.get_json()
+    print(f"[UPDATE API] Received data: {data}")
     if not data or 'image_id' not in data or 'items_to_update' not in data:
         return jsonify({"error": "image_id와 items_to_update가 필요합니다."}), 400
 
