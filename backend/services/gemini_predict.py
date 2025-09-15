@@ -60,7 +60,7 @@ def _call_gemini_for_weights(items_to_predict: list):
         generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
         
         model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash',  # 모델명 수정
+            model_name='gemini-2.5-flash',  # 모델명 수정하고 싶으면 해도 됨 pro는 분당 6개 일일25개
             system_instruction=SYSTEM_PROMPT_WEIGHT_PREDICTION,
             generation_config=generation_config
         )
