@@ -74,11 +74,33 @@ def save_analysis_results():
                     AND COLUMN_NAME = 'destination'
                 """, (db_name,))
                 if cursor.fetchone()['cnt'] == 0:
-                    cursor.execute("""
-                        ALTER TABLE analysis_results
-                        ADD COLUMN destination VARCHAR(100) NULL
-                    """)
+                    cursor.execute("ALTER TABLE analysis_results ADD COLUMN destination VARCHAR(100) NULL")
                     print("[DB MIGRATION] 'destination' column added to 'analysis_results' table.")
+
+                # Schema migration: analysis_items에 predicted_weight_value와 predicted_weight_unit 컬럼이 없는 경우 추가
+                # predicted_weight_value 컬럼 확인 및 추가
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt
+                    FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = %s
+                    AND TABLE_NAME = 'analysis_items'
+                    AND COLUMN_NAME = 'predicted_weight_value'
+                """, (db_name,))
+                if cursor.fetchone()['cnt'] == 0:
+                    cursor.execute("ALTER TABLE analysis_items ADD COLUMN predicted_weight_value DECIMAL(10, 2) NULL")
+                    print("[DB MIGRATION] 'predicted_weight_value' column added to 'analysis_items' table.")
+
+                # predicted_weight_unit 컬럼 확인 및 추가
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt
+                    FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = %s
+                    AND TABLE_NAME = 'analysis_items'
+                    AND COLUMN_NAME = 'predicted_weight_unit'
+                """, (db_name,))
+                if cursor.fetchone()['cnt'] == 0:
+                    cursor.execute("ALTER TABLE analysis_items ADD COLUMN predicted_weight_unit VARCHAR(10) COLLATE utf8mb4_unicode_ci NULL")
+                    print("[DB MIGRATION] 'predicted_weight_unit' column added to 'analysis_items' table.")
                 
                 # 분석 결과 저장
                 # ISO 형식의 날짜를 MySQL datetime 형식으로 변환

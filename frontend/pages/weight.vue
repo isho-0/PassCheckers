@@ -21,7 +21,7 @@
             <q-icon name="history" color="primary" size="28px" />
             분류 기록 선택
           </div>
-          <div v-if="isLoading" class="text-center">
+          <div v-if="isHistoryLoading" class="text-center">
             <q-spinner-dots color="primary" size="40px" />
             <p>분석 기록을 불러오는 중입니다...</p>
           </div>
@@ -67,16 +67,6 @@
             <p style="font-size: 1.2rem;">왼쪽에서 분석 기록을 선택하세요.</p>
           </div>
           <div v-else>
-            <!-- Season Buttons Section -->
-            <div class="detail-card" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; background: white;">
-              <span class="card-title" style="font-size: 1rem;">여행지에 계절은 어떤가요?</span>
-              <div style="display: flex; gap: 8px;">
-                <q-btn unelevated no-caps label="여름" class="season-btn summer" :class="{ 'selected': selectedSeason === '여름' }" @click="selectedSeason = '여름'" />
-                <q-btn unelevated no-caps label="봄/가을" class="season-btn autumn" :class="{ 'selected': selectedSeason === '봄/가을' }" @click="selectedSeason = '봄/가을'" />
-                <q-btn unelevated no-caps label="겨울" class="season-btn winter" :class="{ 'selected': selectedSeason === '겨울' }" @click="selectedSeason = '겨울'" />
-              </div>
-            </div>
-
             <!-- 이미지 -->
             <q-card flat bordered style="border-radius: 16px; margin-bottom: 24px;">
               <q-img 
@@ -96,18 +86,18 @@
               </div>
             </q-card>
 
-            <div style="display: flex; flex-direction: column; gap: 24px;">
+            <div v-if="!isWeightLoading && weightData" style="display: flex; flex-direction: column; gap: 24px;">
               <!-- 예상 무게 (Full Width) -->
               <q-card flat bordered class="detail-card">
                 <div class="card-title">
                   <q-icon name="scale" />
                   <span>예상 무게</span>
                 </div>
-                <div style="font-size: 2.5rem; font-weight: bold; color: #1976D2; text-align: center; margin: 16px 0;">12.5 kg</div>
+                <div style="font-size: 2.5rem; font-weight: bold; color: #1976D2; text-align: center; margin: 16px 0;">
+                  {{ animatedWeight.toFixed(1) }} kg
+                </div>
                 <div style="padding: 0 8px; margin-bottom: 8px;">
-                  <div style="background-color: #e0e0e0; border-radius: 6px; height: 12px; overflow: hidden;">
-                    <div style="background-color: #1976D2; width: 41.6%; height: 100%; border-radius: 6px;"></div>
-                  </div>
+                  <q-linear-progress rounded size="12px" :value="animatedWeight / 30" color="primary" class="q-mt-sm" />
                   <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #888; margin-top: 4px;">
                     <span>0kg</span>
                     <span>30kg</span>
@@ -122,13 +112,13 @@
                   <span>캐리어 사이즈 추천</span>
                 </div>
                 <div style="text-align: center; padding: 12px 0;">
-                  <div style="font-size: 1.8rem; font-weight: bold; color: #1976D2;">24인치 (중형)</div>
-                  <div style="font-size: 0.9rem; color: #888; margin-top: 4px;">예상 무게 12.5kg 기준</div>
+                  <div style="font-size: 1.8rem; font-weight: bold; color: #1976D2;">{{ recommendedCarrier.size }}</div>
+                  <div style="font-size: 0.9rem; color: #888; margin-top: 4px;">예상 무게 {{ weightData.total_weight_kg }}kg 기준</div>
                 </div>
                 <q-list dense separator style="border-top: 1px solid #f0f0f0;">
-                  <q-item style="padding: 8px 4px;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">20인치 이하</q-item-section><q-item-section style="color: #666;">10kg 미만 (기내용, 1-3박)</q-item-section></q-item>
-                  <q-item style="padding: 8px 4px; background-color: #f8fbff;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">24인치</q-item-section><q-item-section style="color: #666;">10-15kg (위탁용, 3-5박)</q-item-section></q-item>
-                  <q-item style="padding: 8px 4px;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">28인치 이상</q-item-section><q-item-section style="color: #666;">15kg 이상 (위탁용, 장기 여행)</q-item-section></q-item>
+                  <q-item :active="recommendedCarrier.size.startsWith('20')" active-class="bg-blue-1" style="padding: 8px 4px;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">20인치 이하</q-item-section><q-item-section style="color: #666;">10kg 미만 (기내용, 1-3박)</q-item-section></q-item>
+                  <q-item :active="recommendedCarrier.size.startsWith('24')" active-class="bg-blue-1" style="padding: 8px 4px;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">24인치</q-item-section><q-item-section style="color: #666;">10-17kg (위탁용, 3-5박)</q-item-section></q-item>
+                  <q-item :active="recommendedCarrier.size.startsWith('28')" active-class="bg-blue-1" style="padding: 8px 4px;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">28인치 이상</q-item-section><q-item-section style="color: #666;">17kg 이상 (위탁용, 장기 여행)</q-item-section></q-item>
                 </q-list>
               </q-card>
 
@@ -139,9 +129,14 @@
                   <span>물품 분석 정보</span>
                 </div>
                 <q-list separator style="margin-top: 8px;">
-                  <q-item v-for="item in detectedItems" :key="item.name">
-                    <q-item-section>{{ item.name }}</q-item-section>
-                    <q-item-section side>{{ item.weight }}</q-item-section>
+                  <q-item v-for="item in weightData.items" :key="item.item_name_ko">
+                    <q-item-section>{{ item.item_name_ko }}</q-item-section>
+                    <q-item-section side v-if="item.predicted_weight_value !== null">
+                      {{ formatWeight(item.predicted_weight_value, item.predicted_weight_unit) }}
+                    </q-item-section>
+                    <q-item-section side v-else>
+                      <span class="text-grey">무게 정보 없음</span>
+                    </q-item-section>
                   </q-item>
                 </q-list>
               </q-card>
@@ -154,10 +149,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useAuth } from '~/composables/useAuth';
-
-type Season = '여름' | '봄/가을' | '겨울';
+import { useQuasar } from 'quasar';
 
 interface ClassificationHistory {
   id: number;
@@ -168,47 +162,131 @@ interface ClassificationHistory {
   thumbnail_url: string | null;
 }
 
+interface WeightItem {
+  item_name_ko: string;
+  predicted_weight_value: number | null;
+  predicted_weight_unit: string | null;
+}
+
+interface WeightData {
+  items: WeightItem[];
+  total_weight_kg: number;
+}
+
 const { user } = useAuth();
 const apiBaseUrl = 'http://localhost:5001'; // 백엔드 서버 주소
+const $q = useQuasar();
 
-const selectedSeason = ref<Season>('여름');
 const classificationHistory = ref<ClassificationHistory[]>([]);
 const selectedHistory = ref<ClassificationHistory | null>(null);
-const isLoading = ref(true);
+const isHistoryLoading = ref(true);
 
+const weightData = ref<WeightData | null>(null);
+const isWeightLoading = ref(false);
+const animatedWeight = ref(0);
+let animationFrameId: number;
+
+// Fetch classification history
 const fetchHistory = async () => {
   if (!user.value) {
-    console.log("사용자 정보가 없어 분석 기록을 가져올 수 없습니다.");
-    isLoading.value = false;
+    isHistoryLoading.value = false;
     return;
   }
-  
-  isLoading.value = true;
+  isHistoryLoading.value = true;
   try {
     const response = await fetch(`${apiBaseUrl}/api/analysis/history/${user.value.id}`);
-    if (!response.ok) {
-      throw new Error('분석 기록을 가져오는데 실패했습니다.');
-    }
+    if (!response.ok) throw new Error('분석 기록을 가져오는데 실패했습니다.');
     const data = await response.json();
     classificationHistory.value = data.results;
-
   } catch (error) {
     console.error(error);
+    $q.notify({ type: 'negative', message: '분석 기록을 불러오는 중 오류가 발생했습니다.' });
   } finally {
-    isLoading.value = false;
+    isHistoryLoading.value = false;
   }
 };
 
 onMounted(fetchHistory);
 
-const detectedItems = ref([
-  { name: '노트북', weight: '1.5 kg' },
-  { name: '의류', weight: '5.0 kg' },
-  { name: '책 2권', weight: '1.0 kg' },
-  { name: '카메라', weight: '0.8 kg' },
-  { name: '세면도구', weight: '1.2 kg' },
-  { name: '기타', weight: '3.0 kg' },
-]);
+// Fetch weight prediction when a history item is selected
+const fetchWeightPrediction = async (analysisId: number) => {
+  isWeightLoading.value = true;
+  weightData.value = null;
+  $q.loading.show({
+    message: '예상 무게를 예측하는 중입니다...<br/><span class="text-amber text-italic">Gemini API가 응답하고 있습니다.</span>',
+    html: true,
+  });
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/weight/predict/${analysisId}`);
+    if (!response.ok) throw new Error('무게 예측에 실패했습니다.');
+    const data: WeightData = await response.json();
+    weightData.value = data;
+  } catch (error) {
+    console.error(error);
+    $q.notify({ type: 'negative', message: '무게 예측 중 오류가 발생했습니다.' });
+  } finally {
+    isWeightLoading.value = false;
+    $q.loading.hide();
+  }
+};
+
+watch(selectedHistory, (newHistory) => {
+  if (newHistory) {
+    fetchWeightPrediction(newHistory.id);
+  } else {
+    weightData.value = null;
+  }
+});
+
+// Animate weight value
+watch(weightData, (newData) => {
+  cancelAnimationFrame(animationFrameId);
+  if (!newData) {
+    animatedWeight.value = 0;
+    return;
+  }
+
+  const targetWeight = newData.total_weight_kg;
+  const duration = 1000; // 1 second
+  let start: number | null = null;
+
+  const step = (timestamp: number) => {
+    if (!start) start = timestamp;
+    const progress = Math.min((timestamp - start) / duration, 1);
+    animatedWeight.value = progress * targetWeight;
+    if (progress < 1) {
+      animationFrameId = requestAnimationFrame(step);
+    } else {
+      animatedWeight.value = targetWeight; // Ensure it ends exactly on target
+    }
+  };
+  animationFrameId = requestAnimationFrame(step);
+});
+
+// Carrier recommendation logic
+const recommendedCarrier = computed(() => {
+  const totalWeight = weightData.value?.total_weight_kg ?? 0;
+  if (totalWeight < 10) {
+    return { size: '20인치 이하', desc: '10kg 미만 (기내용, 1-3박)' };
+  } else if (totalWeight >= 10 && totalWeight <= 17) {
+    return { size: '24인치', desc: '10-17kg (위탁용, 3-5박)' };
+  } else {
+    return { size: '28인치 이상', desc: '17kg 이상 (위탁용, 장기 여행)' };
+  }
+});
+
+// Format individual item weight
+const formatWeight = (value: number, unit: string | null) => {
+  if (unit === 'g') {
+    return `${Number(value)}g`;
+  }
+  if (unit === 'kg') {
+    // parseFloat to remove trailing zeros, e.g., 2.20 -> 2.2
+    return `${parseFloat(Number(value).toFixed(2))}kg`;
+  }
+  return value;
+};
+
 </script>
 
 <style scoped>
