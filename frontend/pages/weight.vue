@@ -86,21 +86,31 @@
               </div>
             </q-card>
 
-            <div v-if="!isWeightLoading && weightData" style="display: flex; flex-direction: column; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 24px;">
               <!-- 예상 무게 (Full Width) -->
               <q-card flat bordered class="detail-card">
                 <div class="card-title">
                   <q-icon name="scale" />
                   <span>예상 무게</span>
                 </div>
-                <div style="font-size: 2.5rem; font-weight: bold; color: #1976D2; text-align: center; margin: 16px 0;">
-                  {{ animatedWeight.toFixed(1) }} kg
+                <div v-if="isWeightLoading" class="card-content-placeholder">
+                  <q-spinner-dots color="primary" size="40px" />
+                  <p>예상 무게를 예측 중입니다...</p>
                 </div>
-                <div style="padding: 0 8px; margin-bottom: 8px;">
-                  <q-linear-progress rounded size="12px" :value="animatedWeight / 30" color="primary" class="q-mt-sm" />
-                  <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #888; margin-top: 4px;">
-                    <span>0kg</span>
-                    <span>30kg</span>
+                <div v-else-if="weightError" class="card-content-placeholder text-negative">
+                  <q-icon name="error_outline" size="40px" />
+                  <p>{{ weightError }}</p>
+                </div>
+                <div v-else-if="weightData">
+                  <div style="font-size: 2.5rem; font-weight: bold; color: #1976D2; text-align: center; margin: 16px 0;">
+                    {{ animatedWeight.toFixed(1) }} kg
+                  </div>
+                  <div style="padding: 0 8px; margin-bottom: 8px;">
+                    <q-linear-progress rounded size="12px" :value="animatedWeight / 30" color="primary" class="q-mt-sm" />
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #888; margin-top: 4px;">
+                      <span>0kg</span>
+                      <span>30kg</span>
+                    </div>
                   </div>
                 </div>
               </q-card>
@@ -111,15 +121,32 @@
                   <q-icon name="luggage" />
                   <span>캐리어 사이즈 추천</span>
                 </div>
-                <div style="text-align: center; padding: 12px 0;">
-                  <div style="font-size: 1.8rem; font-weight: bold; color: #1976D2;">{{ recommendedCarrier.size }}</div>
-                  <div style="font-size: 0.9rem; color: #888; margin-top: 4px;">예상 무게 {{ weightData.total_weight_kg }}kg 기준</div>
+                <div v-if="isWeightLoading" class="card-content-placeholder">
+                  <q-spinner-dots color="primary" size="24px" />
                 </div>
-                <q-list dense separator style="border-top: 1px solid #f0f0f0;">
-                  <q-item :active="recommendedCarrier.size.startsWith('20')" active-class="bg-blue-1" style="padding: 8px 4px;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">20인치 이하</q-item-section><q-item-section style="color: #666;">10kg 미만 (기내용, 1-3박)</q-item-section></q-item>
-                  <q-item :active="recommendedCarrier.size.startsWith('24')" active-class="bg-blue-1" style="padding: 8px 4px;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">24인치</q-item-section><q-item-section style="color: #666;">10-17kg (위탁용, 3-5박)</q-item-section></q-item>
-                  <q-item :active="recommendedCarrier.size.startsWith('28')" active-class="bg-blue-1" style="padding: 8px 4px;"><q-item-section side style="min-width: 110px; font-weight: 500; padding-left: 8px;">28인치 이상</q-item-section><q-item-section style="color: #666;">17kg 이상 (위탁용, 장기 여행)</q-item-section></q-item>
-                </q-list>
+                <div v-else-if="weightError" class="card-content-placeholder text-negative">
+                  <q-icon name="error_outline" size="24px" />
+                </div>
+                <div v-else-if="weightData">
+                  <div style="text-align: center; padding: 12px 0;">
+                    <div style="font-size: 1.8rem; font-weight: bold; color: #1976D2;">{{ recommendedCarrier.size }}</div>
+                    <div style="font-size: 0.9rem; color: #888; margin-top: 4px;">예상 무게 {{ weightData.total_weight_kg }}kg 기준</div>
+                  </div>
+                  <q-list dense separator style="border-top: 1px solid #f0f0f0;">
+                    <q-item :active="recommendedCarrier.size === '20인치 이하'" active-class="bg-blue-1 text-weight-bold" style="padding: 8px 4px;">
+                      <q-item-section side style="min-width: 110px; padding-left: 8px;">20인치 이하</q-item-section>
+                      <q-item-section style="color: #666;">10kg 미만 (기내용, 1-3박)</q-item-section>
+                    </q-item>
+                    <q-item :active="recommendedCarrier.size === '24인치'" active-class="bg-blue-1 text-weight-bold" style="padding: 8px 4px;">
+                      <q-item-section side style="min-width: 110px; padding-left: 8px;">24인치</q-item-section>
+                      <q-item-section style="color: #666;">10-17kg (위탁용, 3-5박)</q-item-section>
+                    </q-item>
+                    <q-item :active="recommendedCarrier.size === '28인치 이상'" active-class="bg-blue-1 text-weight-bold" style="padding: 8px 4px;">
+                      <q-item-section side style="min-width: 110px; padding-left: 8px;">28인치 이상</q-item-section>
+                      <q-item-section style="color: #666;">17kg 이상 (위탁용, 장기 여행)</q-item-section>
+                    </q-item>
+                  </q-list>
+                </div>
               </q-card>
 
               <!-- 물품 분석 -->
@@ -128,7 +155,13 @@
                   <q-icon name="checklist" />
                   <span>물품 분석 정보</span>
                 </div>
-                <q-list separator style="margin-top: 8px;">
+                 <div v-if="isWeightLoading" class="card-content-placeholder">
+                  <q-spinner-dots color="primary" size="24px" />
+                </div>
+                <div v-else-if="weightError" class="card-content-placeholder text-negative">
+                  <q-icon name="error_outline" size="24px" />
+                </div>
+                <q-list v-else-if="weightData" separator style="margin-top: 8px;">
                   <q-item v-for="item in weightData.items" :key="item.item_name_ko">
                     <q-item-section>{{ item.item_name_ko }}</q-item-section>
                     <q-item-section side v-if="item.predicted_weight_value !== null">
@@ -137,6 +170,9 @@
                     <q-item-section side v-else>
                       <span class="text-grey">무게 정보 없음</span>
                     </q-item-section>
+                  </q-item>
+                  <q-item v-if="weightData.items.length === 0">
+                    <q-item-section class="text-grey">무게가 예측된 물품이 없습니다.</q-item-section>
                   </q-item>
                 </q-list>
               </q-card>
@@ -183,6 +219,7 @@ const isHistoryLoading = ref(true);
 
 const weightData = ref<WeightData | null>(null);
 const isWeightLoading = ref(false);
+const weightError = ref<string | null>(null);
 const animatedWeight = ref(0);
 let animationFrameId: number;
 
@@ -212,21 +249,21 @@ onMounted(fetchHistory);
 const fetchWeightPrediction = async (analysisId: number) => {
   isWeightLoading.value = true;
   weightData.value = null;
-  $q.loading.show({
-    message: '예상 무게를 예측하는 중입니다...<br/><span class="text-amber text-italic">Gemini API가 응답하고 있습니다.</span>',
-    html: true,
-  });
+  weightError.value = null;
+  
   try {
     const response = await fetch(`${apiBaseUrl}/api/weight/predict/${analysisId}`);
-    if (!response.ok) throw new Error('무게 예측에 실패했습니다.');
-    const data: WeightData = await response.json();
-    weightData.value = data;
-  } catch (error) {
+    const resData = await response.json();
+    if (!response.ok) {
+      throw new Error(resData.details || '무게 예측에 실패했습니다.');
+    }
+    weightData.value = resData;
+  } catch (error: any) {
     console.error(error);
-    $q.notify({ type: 'negative', message: '무게 예측 중 오류가 발생했습니다.' });
+    weightError.value = error.message || '알 수 없는 오류가 발생했습니다.';
+    $q.notify({ type: 'negative', message: weightError.value });
   } finally {
     isWeightLoading.value = false;
-    $q.loading.hide();
   }
 };
 
@@ -235,13 +272,14 @@ watch(selectedHistory, (newHistory) => {
     fetchWeightPrediction(newHistory.id);
   } else {
     weightData.value = null;
+    weightError.value = null;
   }
 });
 
 // Animate weight value
 watch(weightData, (newData) => {
   cancelAnimationFrame(animationFrameId);
-  if (!newData) {
+  if (!newData || newData.total_weight_kg === null) {
     animatedWeight.value = 0;
     return;
   }
@@ -267,11 +305,11 @@ watch(weightData, (newData) => {
 const recommendedCarrier = computed(() => {
   const totalWeight = weightData.value?.total_weight_kg ?? 0;
   if (totalWeight < 10) {
-    return { size: '20인치 이하', desc: '10kg 미만 (기내용, 1-3박)' };
+    return { size: '20인치 이하' };
   } else if (totalWeight >= 10 && totalWeight <= 17) {
-    return { size: '24인치', desc: '10-17kg (위탁용, 3-5박)' };
+    return { size: '24인치' };
   } else {
-    return { size: '28인치 이상', desc: '17kg 이상 (위탁용, 장기 여행)' };
+    return { size: '28인치 이상' };
   }
 });
 
@@ -281,7 +319,6 @@ const formatWeight = (value: number, unit: string | null) => {
     return `${Number(value)}g`;
   }
   if (unit === 'kg') {
-    // parseFloat to remove trailing zeros, e.g., 2.20 -> 2.2
     return `${parseFloat(Number(value).toFixed(2))}kg`;
   }
   return value;
@@ -329,5 +366,15 @@ const formatWeight = (value: number, unit: string | null) => {
   font-weight: 600;
   font-size: 1.1rem;
   color: #333;
+}
+
+.card-content-placeholder {
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  color: #888;
 }
 </style>
