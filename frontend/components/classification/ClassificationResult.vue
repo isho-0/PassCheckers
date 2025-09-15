@@ -575,7 +575,7 @@ const confirmItemEdit = (item) => {
     return;
   }
   item.isEditing = false;
-  item.originalName = item.name_ko; // 수정된 이름을 새로운 원본 이름으로 저장
+  // item.originalName = item.name_ko; // This is the bug. Do not update originalName here.
 }
 
 const startRedrawBbox = (item, index) => {

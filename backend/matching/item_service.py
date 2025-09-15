@@ -97,7 +97,7 @@ class ItemService:
 
         # 이름이 변경된 경우, 새 물품 정보를 찾아야 합니다.
         if new_name_ko and new_name_ko != detected_item.get('item_name'):
-            updates['item_name'] = new_name_ko
+            updates['name_ko'] = new_name_ko
             
             # 1. 새 이름으로 items 테이블에서 조회
             item_details = ItemModel.get_by_name(new_name_ko)
