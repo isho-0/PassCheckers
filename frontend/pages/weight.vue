@@ -67,6 +67,16 @@
             <p style="font-size: 1.2rem;">왼쪽에서 분석 기록을 선택하세요.</p>
           </div>
           <div v-else>
+            <!-- 계절 선택 버튼 -->
+            <div class="detail-card" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; background: white;">
+              <span class="card-title" style="font-size: 1rem;">여행지 계절은 어떤가요?</span>
+              <div style="display: flex; gap: 8px;">
+                <q-btn unelevated no-caps label="여름" class="season-btn summer" :class="{ 'selected': selectedSeason === '여름' }" @click="selectedSeason = '여름'" />
+                <q-btn unelevated no-caps label="봄/가을" class="season-btn autumn" :class="{ 'selected': selectedSeason === '봄/가을' }" @click="selectedSeason = '봄/가을'" />
+                <q-btn unelevated no-caps label="겨울" class="season-btn winter" :class="{ 'selected': selectedSeason === '겨울' }" @click="selectedSeason = '겨울'" />
+              </div>
+            </div>
+
             <!-- 이미지 -->
             <q-card flat bordered style="border-radius: 16px; margin-bottom: 24px;">
               <q-img 
@@ -101,7 +111,7 @@
                   <q-icon name="error_outline" size="40px" />
                   <p>{{ weightError }}</p>
                 </div>
-                <div v-else-if="weightData">
+                <div v-else-if="adjustedWeightData">
                   <div style="font-size: 2.5rem; font-weight: bold; color: #1976D2; text-align: center; margin: 16px 0;">
                     {{ animatedWeight.toFixed(1) }} kg
                   </div>
@@ -127,10 +137,10 @@
                 <div v-else-if="weightError" class="card-content-placeholder text-negative">
                   <q-icon name="error_outline" size="24px" />
                 </div>
-                <div v-else-if="weightData">
+                <div v-else-if="adjustedWeightData">
                   <div style="text-align: center; padding: 12px 0;">
                     <div style="font-size: 1.8rem; font-weight: bold; color: #1976D2;">{{ recommendedCarrier.size }}</div>
-                    <div style="font-size: 0.9rem; color: #888; margin-top: 4px;">예상 무게 {{ weightData.total_weight_kg }}kg 기준</div>
+                    <div style="font-size: 0.9rem; color: #888; margin-top: 4px;">예상 무게 {{ adjustedWeightData.total_weight_kg.toFixed(2) }}kg 기준</div>
                   </div>
                   <q-list dense separator style="border-top: 1px solid #f0f0f0;">
                     <q-item :active="recommendedCarrier.size === '20인치 이하'" active-class="bg-blue-1 text-weight-bold" style="padding: 8px 4px;">
@@ -161,8 +171,8 @@
                 <div v-else-if="weightError" class="card-content-placeholder text-negative">
                   <q-icon name="error_outline" size="24px" />
                 </div>
-                <q-list v-else-if="weightData" separator style="margin-top: 8px;">
-                  <q-item v-for="item in weightData.items" :key="item.item_name_ko">
+                <q-list v-else-if="adjustedWeightData" separator style="margin-top: 8px;">
+                  <q-item v-for="item in adjustedWeightData.items" :key="item.item_name_ko">
                     <q-item-section>{{ item.item_name_ko }}</q-item-section>
                     <q-item-section side v-if="item.predicted_weight_value !== null">
                       {{ formatWeight(item.predicted_weight_value, item.predicted_weight_unit) }}
@@ -171,7 +181,7 @@
                       <span class="text-grey">무게 정보 없음</span>
                     </q-item-section>
                   </q-item>
-                  <q-item v-if="weightData.items.length === 0">
+                  <q-item v-if="adjustedWeightData.items.length === 0">
                     <q-item-section class="text-grey">무게가 예측된 물품이 없습니다.</q-item-section>
                   </q-item>
                 </q-list>
@@ -189,6 +199,8 @@ import { ref, onMounted, watch, computed } from 'vue';
 import { useAuth } from '~/composables/useAuth';
 import { useQuasar } from 'quasar';
 
+type Season = '여름' | '봄/가을' | '겨울';
+
 interface ClassificationHistory {
   id: number;
   destination: string | null;
@@ -200,7 +212,7 @@ interface ClassificationHistory {
 
 interface WeightItem {
   item_name_ko: string;
-  predicted_weight_value: number | null;
+  predicted_weight_value: number | string | null;
   predicted_weight_unit: string | null;
 }
 
@@ -217,6 +229,7 @@ const classificationHistory = ref<ClassificationHistory[]>([]);
 const selectedHistory = ref<ClassificationHistory | null>(null);
 const isHistoryLoading = ref(true);
 
+const selectedSeason = ref<Season>('봄/가을');
 const weightData = ref<WeightData | null>(null);
 const isWeightLoading = ref(false);
 const weightError = ref<string | null>(null);
@@ -258,6 +271,7 @@ const fetchWeightPrediction = async (analysisId: number) => {
       throw new Error(resData.details || '무게 예측에 실패했습니다.');
     }
     weightData.value = resData;
+    selectedSeason.value = '봄/가을'; // Reset to default season on new selection
   } catch (error: any) {
     console.error(error);
     weightError.value = error.message || '알 수 없는 오류가 발생했습니다.';
@@ -276,8 +290,66 @@ watch(selectedHistory, (newHistory) => {
   }
 });
 
+const CLOTHING_KEYWORDS = ['의류', '옷', '자켓', '코트', '셔츠', '바지', '스웨터', '티셔츠', '가디건', '패딩', '점퍼', '드레스', '치마'];
+
+// Adjust weight based on selected season
+const adjustedWeightData = computed(() => {
+  if (!weightData.value) return null;
+
+  const adjustment = {
+    '여름': -0.4, // -40%
+    '봄/가을': 0, // 0%
+    '겨울': 0.6, // +60%
+  };
+  const multiplier = adjustment[selectedSeason.value];
+
+  let totalWeightGrams = 0;
+
+  const adjustedItems = weightData.value.items.map(item => {
+    // Ensure value is a number for calculations
+    const originalValue = item.predicted_weight_value !== null ? parseFloat(item.predicted_weight_value as string) : null;
+    let adjustedValue = originalValue;
+    let adjustedUnit = item.predicted_weight_unit;
+
+    if (originalValue !== null && adjustedUnit !== null) {
+      const isClothing = CLOTHING_KEYWORDS.some(keyword => item.item_name_ko.includes(keyword));
+      
+      if (isClothing && multiplier !== 0) {
+        let originalGrams = adjustedUnit === 'kg' ? originalValue * 1000 : originalValue;
+        originalGrams *= (1 + multiplier);
+        
+        if (originalGrams > 1000) {
+          adjustedValue = originalGrams / 1000;
+          adjustedUnit = 'kg';
+        } else {
+          adjustedValue = originalGrams;
+          adjustedUnit = 'g';
+        }
+      }
+    }
+    return { 
+      ...item, 
+      predicted_weight_value: adjustedValue,
+      predicted_weight_unit: adjustedUnit
+    };
+  });
+
+  // Recalculate total weight from adjusted items
+  adjustedItems.forEach(item => {
+    const value = item.predicted_weight_value;
+    if (value !== null && item.predicted_weight_unit !== null) {
+      totalWeightGrams += item.predicted_weight_unit === 'kg' ? value * 1000 : value;
+    }
+  });
+
+  return {
+    items: adjustedItems,
+    total_weight_kg: totalWeightGrams / 1000,
+  };
+});
+
 // Animate weight value
-watch(weightData, (newData) => {
+watch(adjustedWeightData, (newData) => {
   cancelAnimationFrame(animationFrameId);
   if (!newData || newData.total_weight_kg === null) {
     animatedWeight.value = 0;
@@ -299,11 +371,11 @@ watch(weightData, (newData) => {
     }
   };
   animationFrameId = requestAnimationFrame(step);
-});
+}, { immediate: true });
 
 // Carrier recommendation logic
 const recommendedCarrier = computed(() => {
-  const totalWeight = weightData.value?.total_weight_kg ?? 0;
+  const totalWeight = adjustedWeightData.value?.total_weight_kg ?? 0;
   if (totalWeight < 10) {
     return { size: '20인치 이하' };
   } else if (totalWeight >= 10 && totalWeight <= 17) {
@@ -316,10 +388,10 @@ const recommendedCarrier = computed(() => {
 // Format individual item weight
 const formatWeight = (value: number, unit: string | null) => {
   if (unit === 'g') {
-    return `${Number(value)}g`;
+    return `${Math.round(value)}g`;
   }
   if (unit === 'kg') {
-    return `${parseFloat(Number(value).toFixed(2))}kg`;
+    return `${parseFloat(value.toFixed(2))}kg`;
   }
   return value;
 };
@@ -377,4 +449,19 @@ const formatWeight = (value: number, unit: string | null) => {
   gap: 8px;
   color: #888;
 }
+
+.season-btn {
+  transition: all 0.2s ease-in-out;
+  font-weight: 600;
+}
+
+.season-btn.summer.selected { background-color: #fdd835; color: #424242; }
+.season-btn.summer:not(.selected) { background-color: #fffde7; color: #f57f17; }
+
+.season-btn.autumn.selected { background-color: #ff8a65; color: white; }
+.season-btn.autumn:not(.selected) { background-color: #fbe9e7; color: #d84315; }
+
+.season-btn.winter.selected { background-color: #42a5f5; color: white; }
+.season-btn.winter:not(.selected) { background-color: #e3f2fd; color: #1565c0; }
+
 </style>
