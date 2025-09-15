@@ -297,9 +297,9 @@ const adjustedWeightData = computed(() => {
   if (!weightData.value) return null;
 
   const adjustment = {
-    '여름': -0.4, // -40%
+    '여름': -0.7, // -70%
     '봄/가을': 0, // 0%
-    '겨울': 0.6, // +60%
+    '겨울': 1.5, // +150%
   };
   const multiplier = adjustment[selectedSeason.value];
 
