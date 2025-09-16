@@ -199,6 +199,11 @@ import { ref, onMounted, watch, computed } from 'vue';
 import { useAuth } from '~/composables/useAuth';
 import { useQuasar } from 'quasar';
 
+// 로그인 한 회원만 볼 수 있는 접근 권한 적용
+definePageMeta({
+  middleware: 'auth'
+});
+
 type Season = '여름' | '봄/가을' | '겨울';
 
 interface ClassificationHistory {
@@ -222,7 +227,7 @@ interface WeightData {
 }
 
 const { user } = useAuth();
-const apiBaseUrl = 'http://localhost:5001'; // 백엔드 서버 주소
+const apiBaseUrl = 'http://' + window.location.hostname + ':5001'; // 백엔드 서버 주소
 const $q = useQuasar();
 
 const classificationHistory = ref<ClassificationHistory[]>([]);
@@ -236,7 +241,7 @@ const weightError = ref<string | null>(null);
 const animatedWeight = ref(0);
 let animationFrameId: number;
 
-// Fetch classification history
+// 분류 기록 가져오기
 const fetchHistory = async () => {
   if (!user.value) {
     isHistoryLoading.value = false;
@@ -258,7 +263,7 @@ const fetchHistory = async () => {
 
 onMounted(fetchHistory);
 
-// Fetch weight prediction when a history item is selected
+// 기록 아이템 선택 시 무게 예측 가져오기
 const fetchWeightPrediction = async (analysisId: number) => {
   isWeightLoading.value = true;
   weightData.value = null;
@@ -271,7 +276,7 @@ const fetchWeightPrediction = async (analysisId: number) => {
       throw new Error(resData.details || '무게 예측에 실패했습니다.');
     }
     weightData.value = resData;
-    selectedSeason.value = '봄/가을'; // Reset to default season on new selection
+    selectedSeason.value = '봄/가을'; // 새로운 선택 시 기본 계절로 재설정
   } catch (error: any) {
     console.error(error);
     weightError.value = error.message || '알 수 없는 오류가 발생했습니다.';
@@ -292,7 +297,7 @@ watch(selectedHistory, (newHistory) => {
 
 const CLOTHING_KEYWORDS = ['의류', '옷', '자켓', '코트', '셔츠', '바지', '스웨터', '티셔츠', '가디건', '패딩', '점퍼', '드레스', '치마'];
 
-// Adjust weight based on selected season
+// 선택된 계절에 따라 무게 조정
 const adjustedWeightData = computed(() => {
   if (!weightData.value) return null;
 
@@ -306,7 +311,7 @@ const adjustedWeightData = computed(() => {
   let totalWeightGrams = 0;
 
   const adjustedItems = weightData.value.items.map(item => {
-    // Ensure value is a number for calculations
+    // 계산을 위해 값이 숫자인지 확인
     const originalValue = item.predicted_weight_value !== null ? parseFloat(item.predicted_weight_value as string) : null;
     let adjustedValue = originalValue;
     let adjustedUnit = item.predicted_weight_unit;
@@ -334,7 +339,7 @@ const adjustedWeightData = computed(() => {
     };
   });
 
-  // Recalculate total weight from adjusted items
+  // 조정된 아이템으로 총 무게 재계산
   adjustedItems.forEach(item => {
     const value = item.predicted_weight_value;
     if (value !== null && item.predicted_weight_unit !== null) {
@@ -348,7 +353,7 @@ const adjustedWeightData = computed(() => {
   };
 });
 
-// Animate weight value
+// 무게 값에 애니메이션 적용
 watch(adjustedWeightData, (newData) => {
   cancelAnimationFrame(animationFrameId);
   if (!newData || newData.total_weight_kg === null) {
@@ -357,7 +362,7 @@ watch(adjustedWeightData, (newData) => {
   }
 
   const targetWeight = newData.total_weight_kg;
-  const duration = 1000; // 1 second
+  const duration = 1000; // 1초
   let start: number | null = null;
 
   const step = (timestamp: number) => {
@@ -367,13 +372,13 @@ watch(adjustedWeightData, (newData) => {
     if (progress < 1) {
       animationFrameId = requestAnimationFrame(step);
     } else {
-      animatedWeight.value = targetWeight; // Ensure it ends exactly on target
+      animatedWeight.value = targetWeight; // 정확히 목표 값에서 끝나도록 보장
     }
   };
   animationFrameId = requestAnimationFrame(step);
 }, { immediate: true });
 
-// Carrier recommendation logic
+// 캐리어 추천 로직
 const recommendedCarrier = computed(() => {
   const totalWeight = adjustedWeightData.value?.total_weight_kg ?? 0;
   if (totalWeight < 10) {
@@ -385,7 +390,7 @@ const recommendedCarrier = computed(() => {
   }
 });
 
-// Format individual item weight
+// 개별 아이템 무게 포맷
 const formatWeight = (value: number, unit: string | null) => {
   if (unit === 'g') {
     return `${Math.round(value)}g`;
