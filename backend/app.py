@@ -14,6 +14,7 @@ from service.user_service import UserService, UserExistsException, InvalidCreden
 from routes.classify import classify_bp
 from routes.items import items_bp
 from routes.analysis import analysis_bp
+from routes.locations import locations_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -28,6 +29,7 @@ CORS(app, origins=Config.CORS_ORIGINS, supports_credentials=True)
 app.register_blueprint(classify_bp)
 app.register_blueprint(items_bp)
 app.register_blueprint(analysis_bp)
+app.register_blueprint(locations_bp)
 
 # Redis 연결
 redis_client = redis.from_url(Config.REDIS_URL)
