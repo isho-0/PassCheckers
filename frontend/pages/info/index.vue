@@ -153,6 +153,10 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 
+definePageMeta({
+  middleware: 'auth'
+});
+
 const continents = ref([]);
 const countries = ref([]);
 const cities = ref([]);
