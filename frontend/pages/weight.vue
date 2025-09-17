@@ -243,13 +243,14 @@ let animationFrameId: number;
 
 // 분류 기록 가져오기
 const fetchHistory = async () => {
-  if (!user.value) {
+  const currentUser = user.value;
+  if (!currentUser) {
     isHistoryLoading.value = false;
     return;
   }
   isHistoryLoading.value = true;
   try {
-    const response = await fetch(`${apiBaseUrl}/api/analysis/history/${user.value.id}`);
+    const response = await fetch(`${apiBaseUrl}/api/analysis/history/${currentUser.id}`);
     if (!response.ok) throw new Error('분석 기록을 가져오는데 실패했습니다.');
     const data = await response.json();
     classificationHistory.value = data.results;
@@ -277,9 +278,13 @@ const fetchWeightPrediction = async (analysisId: number) => {
     }
     weightData.value = resData;
     selectedSeason.value = '봄/가을'; // 새로운 선택 시 기본 계절로 재설정
-  } catch (error: any) {
+  } catch (error) {
     console.error(error);
-    weightError.value = error.message || '알 수 없는 오류가 발생했습니다.';
+    if (error instanceof Error) {
+      weightError.value = error.message;
+    } else {
+      weightError.value = '알 수 없는 오류가 발생했습니다.';
+    }
     $q.notify({ type: 'negative', message: weightError.value });
   } finally {
     isWeightLoading.value = false;

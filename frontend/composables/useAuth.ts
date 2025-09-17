@@ -1,6 +1,10 @@
 // 전역 상태로 관리
+interface User {
+  id: number;
+  [key: string]: any;
+}
 const isAuthenticated = ref(false)
-const user = ref(null)
+const user = ref<User | null>(null)
 
 export const useAuth = () => {
 
