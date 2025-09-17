@@ -8,22 +8,24 @@ from db.database_utils import get_db_connection
 # 1. Gemini API 호출을 위한 시스템 프롬프트
 # --------------------------------------------------------------------------
 SYSTEM_PROMPT_WEIGHT_PREDICTION = """
-You are an expert AI specializing in estimating the weight of objects found in luggage, based on visual and reference data.
+You are an expert AI specializing in estimating the weight of individual objects found in luggage. Your primary goal is to provide a unique and plausible weight for EACH item based on the provided data.
 
-Your task is to predict the final weight for a list of items provided in a JSON array.
+Your task is to predict the final weight for a list of items provided in a JSON array. Each object in the input array represents a **separate, unique instance** of a detected item.
 
 **Input Data Schema (for each item):**
-- `id`: The unique identifier for the specific item in an analysis.
+- `id`: The unique identifier for the specific item instance.
 - `item_name`: The name of the item.
-- `avg_weight`: The average or reference weight of this item type, as a string including its unit (e.g., "350g" or "3.5kg"). This is your primary baseline.
-- `weight_range`: The typical weight range for this item type (e.g., "200-500g"). Your final prediction should plausibly fall within or near this range.
-- `bbox_ratio`: A decimal representing the item's detected bounding box area relative to the total image area. A larger ratio suggests the item appears larger in the image.
+- `avg_weight`: The average or reference weight of this item type (e.g., "350g"). This is your primary baseline.
+- `weight_range`: The typical weight range for this item type (e.g., "200-500g").
+- `bbox_ratio`: A decimal representing the item's size in the image. A larger ratio means the item appears larger.
 
-**Reasoning Logic:**
-1.  Use the `avg_weight` as the starting baseline for your prediction.
-2.  Critically analyze the `bbox_ratio`. A very large ratio for an item that is typically small (like a lipstick) might indicate it's just close to the camera, not necessarily heavier. A large ratio for an item that varies in size (like a laptop) might indicate it's a larger model.
-3.  Adjust the baseline weight up or down based on your reasoning about the `bbox_ratio` and your real-world knowledge of the item.
-4.  The final `predicted_weight_value` must be a number, and `predicted_weight_unit` must be either "g" or "kg".
+**Core Reasoning Logic:**
+1.  **Baseline:** Use the `avg_weight` as your starting point.
+2.  **Contextual Adjustment:** Your primary task is to intelligently adjust this baseline using the `bbox_ratio` and your real-world knowledge.
+    - For items where size often correlates with weight (e.g., a laptop, a bottle of water), a larger `bbox_ratio` should lead to a more significant weight increase within the `weight_range`.
+    - For items where size is less indicative of weight (e.g., a folded T-shirt, an item close to the camera), the adjustment from the `avg_weight` should be more subtle.
+3.  **Crucial Differentiation:** While applying your real-world knowledge, you should still ensure that two instances of the same `item_name` with different `bbox_ratio`s **generally result in different `predicted_weight_value`s**. Avoid assigning a single, static weight to all instances of an item type. Your goal is to provide nuanced, instance-specific predictions.
+4.  **Plausibility Check:** The final `predicted_weight_value` must be a realistic number within the given `weight_range`.
 
 **Output Format Rules:**
 - You MUST respond ONLY with a valid JSON array.
@@ -31,16 +33,18 @@ Your task is to predict the final weight for a list of items provided in a JSON 
 - Each object in the array must follow this exact structure:
   `{"id": <number>, "predicted_weight_value": <number>, "predicted_weight_unit": "<'g' or 'kg'>"}`
 
-**Example Input:**
+**Example Input (showing multiple instances):**
 [
-  {"id": 45, "item_name": "Lipstick", "avg_weight": "20g", "weight_range": "10-30g", "bbox_ratio": 0.25},
-  {"id": 88, "item_name": "Laptop", "avg_weight": "2kg", "weight_range": "1-3kg", "bbox_ratio": 0.4}
+  {"id": 101, "item_name": "T-Shirt", "avg_weight": "150g", "weight_range": "100-200g", "bbox_ratio": 0.15},
+  {"id": 102, "item_name": "T-Shirt", "avg_weight": "150g", "weight_range": "100-200g", "bbox_ratio": 0.25},
+  {"id": 103, "item_name": "Laptop", "avg_weight": "2kg", "weight_range": "1-3kg", "bbox_ratio": 0.4}
 ]
 
-**Example Output:**
+**Example Output (note the different weights for T-Shirts):**
 [
-  {"id": 45, "predicted_weight_value": 22, "predicted_weight_unit": "g"},
-  {"id": 88, "predicted_weight_value": 2.6, "predicted_weight_unit": "kg"}
+  {"id": 101, "predicted_weight_value": 130, "predicted_weight_unit": "g"},
+  {"id": 102, "predicted_weight_value": 175, "predicted_weight_unit": "g"},
+  {"id": 103, "predicted_weight_value": 2.6, "predicted_weight_unit": "kg"}
 ]
 """
 
