@@ -139,7 +139,7 @@
                   <q-icon name="donut_large" />
                   <span>카테고리별 무게 분포</span>
                 </div>
-                <div v-if="isCategoryLoading" class="card-content-placeholder">
+                <div v-if="isWeightLoading || isCategoryLoading" class="card-content-placeholder">
                     <q-spinner-dots color="primary" size="40px" />
                     <p>카테고리 정보를 불러오는 중입니다...</p>
                 </div>
@@ -245,7 +245,7 @@ const chartSeries = ref<number[]>([]);
 const chartOptions = ref<any>({
   chart: { type: 'donut', toolbar: { show: true } },
   labels: [],
-  legend: { position: 'bottom' },
+    legend: { position: 'bottom' },
   tooltip: {
     y: {
       formatter: (val: number) => {
@@ -279,6 +279,14 @@ const chartOptions = ref<any>({
               const total = w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0);
               return `${(total / 1000).toFixed(1)} kg`;
             }
+          }
+        }
+      },
+      states: {
+        hover: {
+          filter: {
+            type: 'none',
+            value: 0.1,
           }
         }
       }

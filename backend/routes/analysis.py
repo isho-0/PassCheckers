@@ -59,6 +59,8 @@ def save_analysis_results():
                         bbox_y_min DECIMAL(10,8),
                         bbox_x_max DECIMAL(10,8),
                         bbox_y_max DECIMAL(10,8),
+                        predicted_weight_value DECIMAL(10, 2) NULL,
+                        predicted_weight_unit VARCHAR(10) COLLATE utf8mb4_unicode_ci NULL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (analysis_id) REFERENCES analysis_results(id) ON DELETE CASCADE
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -77,8 +79,8 @@ def save_analysis_results():
                     cursor.execute("ALTER TABLE analysis_results ADD COLUMN destination VARCHAR(100) NULL")
                     print("[DB MIGRATION] 'destination' column added to 'analysis_results' table.")
 
-                # Schema migration: analysis_items에 predicted_weight_value와 predicted_weight_unit 컬럼이 없는 경우 추가
-                # predicted_weight_value 컬럼 확인 및 추가
+                # Schema migration: analysis_items에 weight 관련 컬럼이 없는 경우 위치를 지정하여 추가
+                # predicted_weight_value 컬럼 존재 여부를 기준으로 한 번만 체크합니다.
                 cursor.execute("""
                     SELECT COUNT(*) as cnt
                     FROM information_schema.COLUMNS
@@ -86,21 +88,15 @@ def save_analysis_results():
                     AND TABLE_NAME = 'analysis_items'
                     AND COLUMN_NAME = 'predicted_weight_value'
                 """, (db_name,))
-                if cursor.fetchone()['cnt'] == 0:
-                    cursor.execute("ALTER TABLE analysis_items ADD COLUMN predicted_weight_value DECIMAL(10, 2) NULL")
-                    print("[DB MIGRATION] 'predicted_weight_value' column added to 'analysis_items' table.")
 
-                # predicted_weight_unit 컬럼 확인 및 추가
-                cursor.execute("""
-                    SELECT COUNT(*) as cnt
-                    FROM information_schema.COLUMNS
-                    WHERE TABLE_SCHEMA = %s
-                    AND TABLE_NAME = 'analysis_items'
-                    AND COLUMN_NAME = 'predicted_weight_unit'
-                """, (db_name,))
                 if cursor.fetchone()['cnt'] == 0:
-                    cursor.execute("ALTER TABLE analysis_items ADD COLUMN predicted_weight_unit VARCHAR(10) COLLATE utf8mb4_unicode_ci NULL")
-                    print("[DB MIGRATION] 'predicted_weight_unit' column added to 'analysis_items' table.")
+                    print("[DB MIGRATION] Weight columns not found in 'analysis_items'. Altering table...")
+                    cursor.execute("""
+                        ALTER TABLE `analysis_items`
+                        ADD COLUMN `predicted_weight_value` DECIMAL(10, 2) NULL AFTER `bbox_y_max`,
+                        ADD COLUMN `predicted_weight_unit` VARCHAR(10) COLLATE utf8mb4_unicode_ci NULL AFTER `predicted_weight_value`
+                    """)
+                    print("[DB MIGRATION] 'analysis_items' table altered successfully with new weight columns.")
                 
                 # 분석 결과 저장
                 # ISO 형식의 날짜를 MySQL datetime 형식으로 변환
