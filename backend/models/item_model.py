@@ -114,8 +114,8 @@ class ItemModel:
 
                 cursor.execute("""
                     INSERT INTO items (item_name, item_name_EN, carry_on_allowed, 
-                                     checked_baggage_allowed, notes, notes_EN, source)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                     checked_baggage_allowed, notes, notes_EN, source, category)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     item_data['item_name'],
                     item_data.get('item_name_EN'),
@@ -123,7 +123,8 @@ class ItemModel:
                     checked,
                     item_data.get('notes'),
                     item_data.get('notes_EN'),
-                    'API'
+                    'API',
+                    item_data.get('category') # 새로 추가된 카테고리 필드
                 ))
                 
                 # 새로 추가된 item의 ID 가져오기

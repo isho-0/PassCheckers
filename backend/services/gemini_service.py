@@ -17,15 +17,17 @@ except Exception as e:
     GEMINI_API_KEY = None
 
 # Gemini 모델에게 역할을 부여하고, 응답 규칙을 정의하는 시스템 프롬프트입니다.
+# Gemini 모델에게 역할을 부여하고, 응답 규칙을 정의하는 시스템 프롬프트입니다.
 SYSTEM_PROMPT = """
 You are a specialized AI assistant for a luggage inspection application. Your primary role is to provide accurate baggage regulations and REALISTIC weight estimations for items.
 
 **CRITICAL RULES:**
 1.  You MUST respond with a single, valid JSON object. Do not include any other text or markdown formatting like ```json.
 2.  The JSON object must contain two main keys: "item_data" and "weight_data".
-3.  "item_data" must contain: "item_name", "carry_on_allowed", "checked_baggage_allowed", "notes", "item_name_EN", "notes_EN", "source".
+3.  "item_data" must contain: "item_name", "carry_on_allowed", "checked_baggage_allowed", "notes", "item_name_EN", "notes_EN", "source", "category".
 4.  "weight_data" must contain: "weight_range", "avg_weight_value", "avg_weight_unit".
-5.  All rules for regulations (liquids, batteries) and realistic weight estimation (using g/kg) still apply.
+5.  The "category" MUST be one of the following predefined values: '의류', '전자기기', '세면도구', '신발', '액세서리', '의약품', '서류', '식품', '가방', '기타'.
+6.  All rules for regulations (liquids, batteries) and realistic weight estimation (using g/kg) still apply.
 
 **Regulation Logic (VERY IMPORTANT):**
 * **Liquids, Gels, Aerosols:**
@@ -61,7 +63,8 @@ You are a specialized AI assistant for a luggage inspection application. Your pr
     "notes": "100Wh 이하의 리튬 배터리는 기내 반입만 가능하며, 위탁 수하물은 금지됩니다.",
     "item_name_EN": "Power Bank",
     "notes_EN": "Lithium batteries under 100Wh are allowed in carry-on only and are prohibited in checked baggage.",
-    "source": "API"
+    "source": "API",
+    "category": "전자기기"
   },
   "weight_data": {
     "weight_range": "100-500g",
@@ -151,6 +154,99 @@ def _get_mock_item_info(item_name: str):
         "item_data": mock_item_data,
         "weight_data": mock_weight_data
     }
+
+# --- 카테고리 분류를 위한 새로운 로직 ---
+
+from db.database_utils import get_db_connection
+
+CATEGORY_SYSTEM_PROMPT = """
+You are an intelligent packing assistant. Your task is to categorize a list of items into predefined categories.
+
+**CRITICAL RULES:**
+1. You MUST respond with a single, valid JSON object. Do not include any other text or markdown formatting like ```json.
+2. The JSON object should contain item names as keys and their corresponding category as values.
+3. You MUST use one of the following predefined categories: '의류', '전자기기', '세면도구', '신발', '액세서리', '의약품', '서류', '식품', '가방', '기타'.
+4. If an item does not clearly fit into any category, assign it to '기타'.
+
+**Example Request:**
+["노트북", "티셔츠", "여권", "두통약", "선글라스"]
+
+**Example JSON Response:**
+{
+  "노트북": "전자기기",
+  "티셔츠": "의류",
+  "여권": "서류",
+  "두통약": "의약품",
+  "선글라스": "액세서리"
+}
+"""
+
+def get_and_update_categories(item_names: list) -> dict:
+    """
+    아이템 목록을 받아 카테고리를 조회하고, 없는 경우 Gemini를 통해 얻어와 DB를 업데이트합니다.
+    """
+    if not item_names:
+        return {}
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 이미 카테고리가 있는 아이템 조회
+            format_strings = ','.join(['%s'] * len(item_names))
+            cursor.execute(f"SELECT item_name, category FROM items WHERE item_name IN ({format_strings})", tuple(item_names))
+            results = cursor.fetchall()
+            
+            categorized_items = {row['item_name']: row['category'] for row in results if row['category']}
+            items_to_categorize = [name for name in item_names if name not in categorized_items]
+
+            # 새로 분류가 필요한 아이템이 있다면 Gemini에 요청
+            if items_to_categorize:
+                new_categories = _get_categories_from_gemini(items_to_categorize)
+                if new_categories:
+                    # DB 업데이트
+                    update_data = []
+                    for name, category in new_categories.items():
+                        if name in items_to_categorize:
+                            update_data.append((category, name))
+                            categorized_items[name] = category
+                    
+                    if update_data:
+                        cursor.executemany("UPDATE items SET category = %s WHERE item_name = %s", update_data)
+                        conn.commit()
+                        print(f"[DB UPDATE] Categories updated for: {[d[1] for d in update_data]}")
+
+            return categorized_items
+
+    except Exception as e:
+        print(f"[Category Service] An error occurred: {e}")
+        # 오류 발생 시, 현재까지 분류된 것만이라도 반환
+        return categorized_items if 'categorized_items' in locals() else {}
+    finally:
+        if conn:
+            conn.close()
+
+def _get_categories_from_gemini(items_to_categorize: list) -> dict:
+    """
+    Gemini API를 사용하여 여러 물품의 카테고리를 JSON 형식으로 가져옵니다.
+    """
+    api_key = get_gemini_api_key()
+    if not items_to_categorize or not api_key:
+        return {}
+
+    try:
+        generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
+        model = genai.GenerativeModel(
+            model_name='gemini-1.5-flash',
+            system_instruction=CATEGORY_SYSTEM_PROMPT,
+            generation_config=generation_config
+        )
+        # 리스트를 JSON 문자열로 변환하여 프롬프트에 포함
+        prompt = json.dumps(items_to_categorize, ensure_ascii=False)
+        response = model.generate_content(prompt)
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"[Gemini Category Service] Failed to get categories: {e}")
+        return {}
 
 def get_gemini_api_key():
     """Gemini API 키를 환경변수에서 가져옵니다."""
