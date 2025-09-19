@@ -293,10 +293,16 @@ const chartOptions = ref<any>({
         }
       },
       states: {
+        normal: {
+          filter: {
+            type: 'desaturate',
+            value: 0.65
+          }
+        },
         hover: {
           filter: {
             type: 'none',
-            value: 0.1,
+            value: 0
           }
         }
       }
