@@ -196,6 +196,7 @@ import { useAuth } from '~/composables/useAuth';
 import { useQuasar } from 'quasar';
 import VueApexCharts from 'vue3-apexcharts';
 
+// 로그인 한 회원만 볼 수 있는 접근 권한 적용
 definePageMeta({
   middleware: 'auth'
 });
