@@ -248,7 +248,7 @@ const weightError = ref<string | null>(null);
 const animatedWeight = ref(0);
 let animationFrameId: number;
 
-// --- Chart State ---
+// --- 차트 상태 ---
 const isCategoryLoading = ref(false);
 const itemCategories = ref<{ [key: string]: string }>({});
 const chartSeries = ref<number[]>([]);
@@ -310,7 +310,7 @@ const chartOptions = ref<any>({
   }
 });
 
-// --- Data Fetching ---
+// --- 데이터 가져오기 ---
 
 const fetchHistory = async () => {
   const currentUser = user.value;
@@ -344,14 +344,14 @@ const fetchWeightPrediction = async (analysisId: number) => {
   isWeightLoading.value = true;
   weightData.value = null;
   weightError.value = null;
-  itemCategories.value = {}; // Reset categories
+  itemCategories.value = {}; // 카테고리 초기화
   try {
     const response = await fetch(`${apiBaseUrl}/api/weight/predict/${analysisId}`);
     const resData = await response.json();
     if (!response.ok) throw new Error(resData.details || '무게 예측에 실패했습니다.');
     weightData.value = resData;
     selectedSeason.value = '봄/가을';
-    // After getting weight, fetch categories
+    // 무게 가져온 뒤, 카테고리
     if (resData.items && resData.items.length > 0) {
       await fetchCategories(resData.items);
     }
@@ -395,7 +395,7 @@ watch(selectedHistory, (newHistory) => {
   }
 });
 
-// --- Computed Properties for Display ---
+// --- 옷 계절별 계산 (없애도 됨) ---
 
 const CLOTHING_KEYWORDS = ['의류', '옷', '자켓', '코트', '셔츠', '바지', '스웨터', '티셔츠', '가디건', '패딩', '점퍼', '드레스', '치마'];
 
