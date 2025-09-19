@@ -144,7 +144,15 @@
                     <p>카테고리 정보를 불러오는 중입니다...</p>
                 </div>
                 <div v-else-if="categoryChartData && categoryChartData.series.length > 0">
-                  <VueApexCharts :options="chartOptions" :series="chartSeries" height="350" />
+                  <client-only>
+                    <VueApexCharts :options="chartOptions" :series="chartSeries" height="350" />
+                    <template #placeholder>
+                      <div class="card-content-placeholder" style="height: 350px;">
+                        <q-spinner-dots color="primary" size="40px" />
+                        <p>차트 로딩 중...</p>
+                      </div>
+                    </template>
+                  </client-only>
                 </div>
                 <div v-else class="card-content-placeholder">
                   <q-icon name="info" size="32px" />
@@ -191,15 +199,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, watch, computed, shallowRef, type Component } from 'vue';
 import { useAuth } from '~/composables/useAuth';
 import { useQuasar } from 'quasar';
-import VueApexCharts from 'vue3-apexcharts';
+
+// ApexCharts는 클라이언트 측에서만 동적으로 import 합니다.
+const VueApexCharts = shallowRef<Component | null>(null);
 
 // 로그인 한 회원만 볼 수 있는 접근 권한 적용
 definePageMeta({
   middleware: 'auth'
-});
+})
 
 type Season = '여름' | '봄/가을' | '겨울';
 
@@ -316,7 +326,13 @@ const fetchHistory = async () => {
   }
 };
 
-onMounted(fetchHistory);
+onMounted(async () => {
+  // 클라이언트 측에서만 ApexCharts를 동적으로 import 합니다.
+  const apexchartsModule = await import('vue3-apexcharts');
+  VueApexCharts.value = apexchartsModule.default;
+  
+  fetchHistory();
+});
 
 const fetchWeightPrediction = async (analysisId: number) => {
   isWeightLoading.value = true;
