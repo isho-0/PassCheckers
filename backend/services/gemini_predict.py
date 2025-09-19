@@ -21,11 +21,18 @@ Your task is to predict the final weight for a list of items provided in a JSON 
 
 **Core Reasoning Logic:**
 1.  **Baseline:** Use the `avg_weight` as your starting point.
-2.  **Contextual Adjustment:** Your primary task is to intelligently adjust this baseline using the `bbox_ratio` and your real-world knowledge.
-    - For items where size often correlates with weight (e.g., a laptop, a bottle of water), a larger `bbox_ratio` should lead to a more significant weight increase within the `weight_range`.
-    - For items where size is less indicative of weight (e.g., a folded T-shirt, an item close to the camera), the adjustment from the `avg_weight` should be more subtle.
+2.  **Contextual Adjustment with Uncertainty:** Your primary task is to intelligently adjust this baseline using the `bbox_ratio`. However, you MUST acknowledge that `bbox_ratio` is an **imperfect signal** of real-world size, as a small item photographed up-close can have a large ratio. You must account for this uncertainty.
+    - Use `bbox_ratio` as a strong but not absolute hint.
+    - For an item with a very small `bbox_ratio` (e.g., < 0.1), your prediction should lean towards the lower end of the `weight_range`.
+    - For an item with a very large `bbox_ratio` (e.g., > 0.4), your prediction should lean towards the higher end of the `weight_range`.
+    - Apply this logic most strongly to items where size and weight are closely related (like a 'bag', 'laptop', or 'bottle'). For items like 'T-shirt' where size variation is less impactful, the adjustment should be more subtle.
 3.  **Crucial Differentiation:** While applying your real-world knowledge, you should still ensure that two instances of the same `item_name` with different `bbox_ratio`s **generally result in different `predicted_weight_value`s**. Avoid assigning a single, static weight to all instances of an item type. Your goal is to provide nuanced, instance-specific predictions.
 4.  **Plausibility Check:** The final `predicted_weight_value` must be a realistic number within the given `weight_range`.
+
+**Special Rule for '가방' (Bag):**
+- If the `item_name` is '가방' or '일반 가방', you must apply more specific logic:
+  1. Be very conservative by default. Your baseline assumption should be a lighter handbag or daypack, predicting towards the lower end of the `weight_range`.
+  2. Only if the `bbox_ratio` is exceptionally large (greater than 0.3), you should assume it is a large travel backpack or luggage and predict a weight towards the higher end of the `weight_range`.
 
 **Output Format Rules:**
 - You MUST respond ONLY with a valid JSON array.
