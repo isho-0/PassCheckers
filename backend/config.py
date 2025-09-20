@@ -20,13 +20,6 @@ class Config:
     
     # CORS 설정
     CORS_ORIGINS = [
-        "http://localhost:3000",  # Nuxt 개발 서버
-        "http://localhost:3001",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-        "http://192.168.0.26:3000",
-        "http://192.168.123.41:3000",
-        "http://172.16.14.218:3000",
-        "http://172.16.30.9:3000",
-        "http://192.0.0.2:3000"
+        "http://localhost:3000",
+        "http://passcheckers.kro.kr"
     ] 
