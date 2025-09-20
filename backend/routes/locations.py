@@ -34,7 +34,7 @@ def get_countries_by_continent():
         conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT DISTINCT country_ko, location_id 
+                SELECT DISTINCT country, country_ko, location_id 
                 FROM locations 
                 WHERE continent_ko = %s AND location_type = 'country' 
                 ORDER BY country_ko
@@ -105,6 +105,30 @@ def get_location_details(location_id):
 
     except Exception as e:
         print(f"Error fetching location details for {location_id}: {e}")
+        return jsonify({"error": "서버 오류가 발생했습니다."}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@locations_bp.route('/country-map', methods=['GET'])
+def get_country_map():
+    """DB에서 국가 영문 이름과 location_id의 매핑을 생성하여 반환합니다."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            # 데이터베이스에서 중복을 제거하고 국가 이름과 location_id를 가져옵니다.
+            # location_type이 'country'인 경우만 필터링합니다.
+            cursor.execute("""
+                SELECT country, location_id 
+                FROM locations 
+                WHERE location_type = 'country'
+            """)
+            # 결과를 딕셔너리 형태로 변환합니다: {"country_name": location_id}
+            country_map = {row['country']: row['location_id'] for row in cursor.fetchall()}
+        return jsonify(country_map)
+    except Exception as e:
+        print(f"Error fetching country map: {e}")
         return jsonify({"error": "서버 오류가 발생했습니다."}), 500
     finally:
         if conn:

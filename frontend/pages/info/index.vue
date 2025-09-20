@@ -15,19 +15,20 @@
     <main class="main-content">
       <!-- 왼쪽: 대륙/국가/도시 선택 패널 -->
       <aside class="left-panel">
-        
-        <!-- 대륙 선택 뷰 -->
         <div v-if="currentView === 'continents'">
           <h2 class="panel-title">대륙 선택</h2>
           <div v-if="isLoadingContinents" class="loading-text">... 로딩 중 ...</div>
           <div v-else class="continent-buttons">
-            <button v-for="continent in continents" :key="continent.continent_id" @click="selectContinent(continent)" class="continent-btn">
+            <button v-for="continent in continents" :key="continent.continent_id"
+                    @click="selectContinent(continent)"
+                    @mouseenter="highlightContinent(continent.continent_id)"
+                    @mouseleave="highlightContinent(null)"
+                    class="continent-btn">
               <span class="continent-btn-text">{{ continent.continent_ko }}</span>
             </button>
           </div>
         </div>
 
-        <!-- 국가 선택 뷰 -->
         <div v-if="currentView === 'countries'">
           <div class="panel-header">
             <button @click="goBack" class="back-btn">
@@ -37,14 +38,16 @@
           </div>
           <div v-if="isLoadingCountries" class="loading-text">... 로딩 중 ...</div>
           <div v-else class="country-buttons">
-            <button v-for="country in countries" :key="country.location_id" @click="selectCountry(country)" 
+            <button v-for="country in countries" :key="country.location_id" 
+                    @click="selectCountry(country)" 
+                    @mouseenter="highlightCountry(country.country)" 
+                    @mouseleave="highlightCountry(null)"
                     class="country-btn" :class="{ 'active': selectedCountry && selectedCountry.location_id === country.location_id }">
                <span>{{ country.country_ko }}</span>
             </button>
           </div>
         </div>
 
-        <!-- 도시 선택 뷰 -->
         <div v-if="currentView === 'cities'">
           <div class="panel-header">
             <button @click="goBack" class="back-btn">
@@ -60,14 +63,20 @@
             </button>
           </div>
         </div>
-
       </aside>
 
-      <!-- 오른쪽: 상세 정보 또는 지도 -->
+      <!-- 오른쪽: 지도 또는 상세 정보 -->
       <section class="right-panel">
-        <!-- 상세 정보 표시 -->
-        <div v-if="selectedLocationDetails" class="details-view">
-            <!-- 국가 정보 헤더 -->
+        <div v-if="!selectedLocationDetails" class="map-wrapper">
+          <InteractiveMap 
+            :continent-to-focus="selectedContinent?.continent_id"
+            :country-to-highlight="countryToHighlight"
+            :continent-to-highlight="continentToHighlight"
+          />
+        </div>
+        <div v-else class="details-view-wrapper">
+          <!-- 상세 정보 표시 -->
+          <div class="details-view">
             <div class="detail-header">
                 <div class="country-title-wrapper">
                   <h3 class="country-name">
@@ -75,10 +84,8 @@
                   </h3>
                   <p class="country-name-en">{{ selectedLocationDetails.location.location_type === 'city' ? selectedLocationDetails.location.city : selectedLocationDetails.location.country }}</p>
                 </div>
-                <button @click="goToDetail(selectedLocationDetails.location.location_id)" class="detail-button">상세 정보</button>
+                <button @click="goToDetail(selectedLocationDetails.location.location_id)" class="detail-button">전체 정보 보기</button>
             </div>
-
-            <!-- 여행 예산 카드 -->
             <div v-if="selectedLocationDetails.budget" class="detail-card">
                 <h4 class="card-title">여행 예산</h4>
                 <div class="budget-grid">
@@ -111,39 +118,21 @@
                     </div>
                 </div>
             </div>
-            <div v-else class="no-data-card">예산 정보가 없습니다.</div>
-
-            <!-- 세부 비용 분석 카드 -->
-              <div v-if="selectedLocationDetails.cost_breakdowns && selectedLocationDetails.cost_breakdowns.length" class="detail-card">
-                  <h4 class="card-title">세부 비용 분석 (일일 기준)</h4>
-                  <div class="cost-grid">
-                      <div v-for="item in selectedLocationDetails.cost_breakdowns" :key="item.breakdown_id" class="cost-card">
-                          <div class="cost-card-icon">{{ getCategoryIcon(item.category) }}</div>
-                          <div class="cost-card-category">{{ item.category_ko || item.category }}</div>
-                          <div class="cost-card-prices">
-                              <div class="price-item price-budget">
-                                  <span class="price-label">저</span>
-                                  <span class="price-value">{{ item.budget ? '$' + item.budget : 'N/A' }}</span>
-                              </div>
-                              <div class="price-item price-midrange">
-                                  <span class="price-label">중</span>
-                                  <span class="price-value">{{ item.mid_range ? '$' + item.mid_range : 'N/A' }}</span>
-                              </div>
-                              <div class="price-item price-luxury">
-                                  <span class="price-label">고</span>
-                                  <span class="price-value">{{ item.luxury ? '$' + item.luxury : 'N/A' }}</span>
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-            <div v-else class="no-data-card">세부 비용 정보가 없습니다.</div>
-        </div>
-        
-        <!-- 초기 안내 메시지 -->
-        <div v-else class="map-placeholder">
-          <div v-if="isLoadingDetails" class="loading-text">상세 정보 로딩 중...</div>
-          <p v-else>국가를 선택하면 상세 정보가 표시됩니다.</p>
+            <div v-if="selectedLocationDetails.cost_breakdowns && selectedLocationDetails.cost_breakdowns.length" class="detail-card">
+                <h4 class="card-title">세부 비용 분석 (일일 기준)</h4>
+                <div class="cost-grid">
+                    <div v-for="item in selectedLocationDetails.cost_breakdowns" :key="item.breakdown_id" class="cost-card">
+                        <div class="cost-card-icon">{{ getCategoryIcon(item.category) }}</div>
+                        <div class="cost-card-category">{{ item.category_ko || item.category }}</div>
+                        <div class="cost-card-prices">
+                            <div class="price-item price-budget"><span class="price-label">저</span><span class="price-value">{{ item.budget ? '$' + item.budget : 'N/A' }}</span></div>
+                            <div class="price-item price-midrange"><span class="price-label">중</span><span class="price-value">{{ item.mid_range ? '$' + item.mid_range : 'N/A' }}</span></div>
+                            <div class="price-item price-luxury"><span class="price-label">고</span><span class="price-value">{{ item.luxury ? '$' + item.luxury : 'N/A' }}</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -152,10 +141,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import InteractiveMap from '~/components/InteractiveMap.vue';
 
-definePageMeta({
-  middleware: 'auth'
-});
+definePageMeta({ middleware: 'auth' });
 
 const continents = ref([]);
 const countries = ref([]);
@@ -164,80 +152,74 @@ const selectedContinent = ref(null);
 const selectedCountry = ref(null);
 const selectedCity = ref(null);
 const selectedLocationDetails = ref(null);
+const continentToHighlight = ref(null);
+const countryToHighlight = ref(null);
 
 const isLoadingContinents = ref(false);
 const isLoadingCountries = ref(false);
 const isLoadingCities = ref(false);
 const isLoadingDetails = ref(false);
 
-const currentView = ref('continents'); 
+const currentView = ref('continents');
 const API_BASE_URL = 'http://localhost:5001/api';
 
 const getCategoryIcon = (category) => {
-  const icons = {
-    'Accommodation': '🛏️',
-    'Food': '🍕',
-    'Transportation': '🚌',
-    'Entertainment': '🎭',
-    'Shopping': '🛍️',
-    'Default': '💸'
-  };
+  const icons = { 'Accommodation': '🛏️', 'Food': '🍕', 'Transportation': '🚌', 'Entertainment': '🎭', 'Shopping': '🛍️', 'Default': '💸' };
   return icons[category] || icons['Default'];
 };
 
 const fetchContinents = async () => {
   isLoadingContinents.value = true;
   try {
-    const response = await fetch(`${API_BASE_URL}/locations/continents`);
-    if (!response.ok) throw new Error('대륙 목록 로딩 실패');
-    continents.value = await response.json();
-  } catch (error) { console.error(error); } 
-  finally { isLoadingContinents.value = false; }
+    const res = await fetch(`${API_BASE_URL}/locations/continents`);
+    continents.value = await res.json();
+  } finally {
+    isLoadingContinents.value = false;
+  }
 };
 
 const fetchCountries = async (continentId) => {
   isLoadingCountries.value = true;
-  countries.value = [];
   try {
-    const response = await fetch(`${API_BASE_URL}/locations/countries?continent=${continentId}`);
-    if (!response.ok) throw new Error('국가 목록 로딩 실패');
-    countries.value = await response.json();
-  } catch (error) { console.error(error); } 
-  finally { isLoadingCountries.value = false; }
+    const res = await fetch(`${API_BASE_URL}/locations/countries?continent=${continentId}`);
+    countries.value = await res.json();
+  } finally {
+    isLoadingCountries.value = false;
+  }
 };
 
 const fetchCities = async (countryKo) => {
   isLoadingCities.value = true;
-  cities.value = [];
   try {
-    const response = await fetch(`${API_BASE_URL}/locations/cities?country=${countryKo}`);
-    if (!response.ok) throw new Error('도시 목록 로딩 실패');
-    cities.value = await response.json();
-  } catch (error) { console.error(error); } 
-  finally { isLoadingCities.value = false; }
+    const res = await fetch(`${API_BASE_URL}/locations/cities?country=${countryKo}`);
+    cities.value = await res.json();
+  } finally {
+    isLoadingCities.value = false;
+  }
 };
 
 const fetchLocationDetails = async (locationId) => {
-    if (!locationId) return;
-    isLoadingDetails.value = true;
-    selectedLocationDetails.value = null;
-    try {
-        const response = await fetch(`${API_BASE_URL}/locations/${locationId}`);
-        if (!response.ok) throw new Error('상세 정보 로딩 실패');
-        selectedLocationDetails.value = await response.json();
-    } catch (error) { console.error(error); } 
-    finally { isLoadingDetails.value = false; }
-}
+  isLoadingDetails.value = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/locations/${locationId}`);
+    selectedLocationDetails.value = await res.json();
+  } finally {
+    isLoadingDetails.value = false;
+  }
+};
 
 const selectContinent = (continent) => {
   selectedContinent.value = continent;
+  selectedCountry.value = null;
+  selectedCity.value = null;
+  selectedLocationDetails.value = null;
   currentView.value = 'countries';
   fetchCountries(continent.continent_id);
 };
 
 const selectCountry = (country) => {
   selectedCountry.value = country;
-  selectedCity.value = null; // 국가를 새로 선택했으므로 선택된 도시 초기화
+  selectedCity.value = null;
   currentView.value = 'cities';
   fetchCities(country.country_ko);
   fetchLocationDetails(country.location_id);
@@ -248,17 +230,19 @@ const selectCity = (city) => {
   fetchLocationDetails(city.location_id);
 };
 
-const goToDetail = (locationId) => {
-  if (locationId) {
-    navigateTo(`/info/detail?id=${locationId}`);
-  }
+const highlightContinent = (continentId) => {
+  continentToHighlight.value = continentId;
+};
+
+const highlightCountry = (countryName) => {
+  countryToHighlight.value = countryName;
 };
 
 const goBack = () => {
+  selectedLocationDetails.value = null; // 상세 정보 닫기
   if (currentView.value === 'cities') {
     selectedCountry.value = null;
     selectedCity.value = null;
-    selectedLocationDetails.value = null;
     currentView.value = 'countries';
   } else if (currentView.value === 'countries') {
     selectedContinent.value = null;
@@ -266,14 +250,15 @@ const goBack = () => {
   }
 };
 
-onMounted(() => {
-  fetchContinents();
-});
+const goToDetail = (locationId) => {
+  if (locationId) navigateTo(`/info/detail?id=${locationId}`);
+};
+
+onMounted(fetchContinents);
 
 </script>
 
 <style scoped>
-/* 기존 스타일과 새 스타일 병합 */
 .info-page-container { padding: 2rem; background-color: #f8f9fa; min-height: 100vh; font-family: 'Pretendard', sans-serif; }
 .page-header { text-align: center; margin-bottom: 2rem; }
 .header-title { font-size: 2.5rem; font-weight: 800; color: #212529; display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
@@ -291,8 +276,22 @@ onMounted(() => {
 .continent-btn:hover, .country-btn:hover, .city-btn:hover { background-color: #f1f3f5; border-color: #868e96; color: #212529; transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
 .country-btn.active, .city-btn.active { background-color: #4c6ef5; border-color: #364fc7; color: #ffffff; font-weight: 600; }
 
-.right-panel { flex: 3; }
-.map-placeholder { display: flex; align-items: center; justify-content: center; color: #adb5bd; font-size: 1.25rem; background-color: #fff; border-radius: 0.75rem; border: 1px solid #dee2e6; min-height: 600px; }
+.right-panel { flex: 3; position: relative; }
+.map-wrapper { 
+  background-color: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  height: 682px; /* Match left panel's potential height */
+}
+.details-view-wrapper { 
+  background-color: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
 .loading-text { padding: 1rem; text-align: center; color: #6c757d; }
 
 .details-view { display: flex; flex-direction: column; gap: 1.5rem; }
