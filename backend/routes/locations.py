@@ -92,10 +92,14 @@ def get_location_details(location_id):
             cursor.execute("SELECT * FROM cost_breakdowns WHERE location_id = %s", (location_id,))
             cost_breakdowns = cursor.fetchall()
 
+            cursor.execute("SELECT * FROM location_content WHERE location_id = %s", (location_id,))
+            location_content = cursor.fetchall()
+
         response_data = {
             "location": location,
             "budget": budget,
-            "cost_breakdowns": cost_breakdowns
+            "cost_breakdowns": cost_breakdowns,
+            "location_content": location_content
         }
         return jsonify(response_data)
 

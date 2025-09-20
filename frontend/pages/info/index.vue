@@ -75,7 +75,7 @@
                   </h3>
                   <p class="country-name-en">{{ selectedLocationDetails.location.location_type === 'city' ? selectedLocationDetails.location.city : selectedLocationDetails.location.country }}</p>
                 </div>
-                <button class="detail-button">상세 정보</button>
+                <button @click="goToDetail(selectedLocationDetails.location.location_id)" class="detail-button">상세 정보</button>
             </div>
 
             <!-- 여행 예산 카드 -->
@@ -246,6 +246,12 @@ const selectCountry = (country) => {
 const selectCity = (city) => {
   selectedCity.value = city;
   fetchLocationDetails(city.location_id);
+};
+
+const goToDetail = (locationId) => {
+  if (locationId) {
+    navigateTo(`/info/detail?id=${locationId}`);
+  }
 };
 
 const goBack = () => {
