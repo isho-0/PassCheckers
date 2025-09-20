@@ -29,7 +29,7 @@
               원본 이미지
             </div>
             <q-card flat bordered class="image-card" style="text-align: center; height: 450px; display: flex; align-items: center; justify-content: center;">
-              <div ref="imageContainerRef" class="image-container" style="position: relative; display: inline-block;">
+              <div ref="imageContainerRef" class="image-container" style="position: relative; display: inline-block; width: 100%; height: 100%;">
                 <img 
                   :src="imageUrl" 
                   style="border-radius: 16px; max-width: 100%; max-height: 100%; object-fit: contain;" 
@@ -45,7 +45,7 @@
                     v-for="(item, index) in detectionResults"
                     :key="item.item_id || item.name_ko"
                     :class="['bounding-box', { 'bounding-box--hovered': hoveredIndex === index }]"
-                    :style="calculateBoxStyle(item.bbox, imageContainerRef, originalImageSize)"
+                    :style="calculateBoxStyleForMain(item.bbox, imageContainerRef)"
                   >
                     <div class="box-label">{{ item.name_ko }}</div>
                   </div>
@@ -54,6 +54,42 @@
 
               </div>
             </q-card>
+
+            <!-- 여행지 입력 UI -->
+            <div class="column items-center q-mt-md" style="min-height: 60px;">
+              <transition
+                appear
+                enter-active-class="animated fadeIn"
+                leave-active-class="animated fadeOut"
+                @after-leave="isSaveButtonVisible = true"
+              >
+                <div v-if="showDestinationInput" class="row items-center q-gutter-md">
+                  <q-input
+                    v-model="destination"
+                    label="여행지 입력"
+                    outlined
+                    dense
+                    autofocus
+                    @keyup.enter="saveAnalysisResults"
+                  />
+                  <q-btn 
+                    label="저장" 
+                    color="positive"
+                    @click="saveAnalysisResults"
+                    :loading="isSavingResults"
+                  />
+                  <q-btn 
+                    label="취소" 
+                    color="grey-7"
+                    flat
+                    @click="showDestinationInput = false"
+                  />
+                </div>
+              </transition>
+            </div>
+
+            
+
           </div>
 
           <!-- 오른쪽: 탐지 결과 -->
@@ -136,7 +172,7 @@
       </div>
     </div>
 
-    <!-- 하단 액션 버튼들 -->
+                <!-- 하단 액션 버튼들 -->
     <div class="row justify-center q-mt-lg q-gutter-md">
       <q-btn 
         icon="photo_camera" 
@@ -145,14 +181,20 @@
         outline
         @click="selectNewImage"
       />
-      <q-btn 
-        icon="save" 
-        label="분석 결과 저장" 
-        color="positive"
-        @click.stop="saveAnalysisResults"
-        :loading="isSavingResults"
-        :disable="isSavingResults"
-      />
+      <transition
+        appear
+        enter-active-class="animated fadeIn"
+        leave-active-class="animated fadeOut"
+      >
+        <q-btn 
+          v-if="isSaveButtonVisible"
+          icon="save" 
+          label="분석 결과 저장" 
+          color="positive"
+          @click="isSaveButtonVisible = false; showDestinationInput = true"
+          :disable="isSavingResults"
+        />
+      </transition>
     </div>
 
     <!-- 물품 수정/추가 팝업 -->
@@ -178,15 +220,16 @@
                   <!-- 현재 그리는 BBox -->
                   <div v-if="isDrawing" class="drawing-rect" :style="drawingRectStyle"></div>
                   <!-- 이미 추가된 BBox들 -->
-                  <div 
-                    v-for="(item, index) in itemsInEditor.filter(i => i.bbox && !i.isDeleted)"
-                    :key="`edit-box-${item.item_id || index}`"
-                    class="drawn-box"
-                    :style="getEditorBoxStyle(item.bbox)"
-                    :class="{ 'drawn-box--hovered': editorHoveredIndex === index }"
-                  >
-                    <div class="box-label">{{ item.name_ko }}</div>
-                  </div>
+                  <template v-for="(item, index) in itemsInEditor" :key="`edit-box-${item.item_id || index}`">
+                    <div 
+                      v-if="item.bbox && !item.isDeleted && !item.isDrawingBbox"
+                      class="drawn-box"
+                      :style="getEditorBoxStyle(item.bbox)"
+                      :class="{ 'drawn-box--hovered': editorHoveredIndex === index }"
+                    >
+                      <div class="box-label">{{ item.name_ko }}</div>
+                    </div>
+                  </template>
                 </div>
               </div>
             </q-card>
@@ -200,83 +243,130 @@
                 <q-btn icon="add" label="물품 추가" flat dense @click="addNewItem" />
               </q-card-section>
               <q-separator />
-              <q-list separator class="col q-pt-none">
-                <q-item 
-                  v-for="(item, index) in itemsInEditor" 
-                  :key="item.item_id || `new-${index}`" 
-                  :class="{ 'bg-grey-3': item.isDeleted, 'item-confirmed': item.isConfirmed }"
-                  @mouseenter="editorHoveredIndex = index"
-                  @mouseleave="editorHoveredIndex = null"
-                >
-                  <q-item-section>
-                    <q-select
-                      :ref="(el) => { if (el) searchSelectRefs[index] = el }"
-                      v-if="item.isNew && !item.isConfirmed"
-                      v-model="item.name_ko"
-                      label="물품명 입력 후 Enter로 검색"
-                      autofocus
-                      dense
-                      use-input
-                      fill-input
-                      hide-selected
-                      :options="autocompleteSuggestions"
-                      @new-value="handleNewValue"
-                      new-value-mode="add-unique"
-                      @keyup.enter="handleEnterKey($event, index)"
-                      @blur="onSelectBlur($event, item)"
-                      @input-value="(val) => item.name_ko = val"
-                      autocomplete="off"
-                    >
-                      <template v-slot:no-option>
-                        <q-item>
-                          <q-item-section class="text-grey">
-                            일치하는 항목이 없습니다.
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-select>
-
-                    <div v-if="item.isNew && item.isConfirmed" class="confirmed-item row items-center no-wrap">
-                      <q-item-label class="col">{{ item.name_ko }}</q-item-label>
-                      <q-btn round dense flat icon="edit" @click="item.isConfirmed = false" class="q-ml-sm">
-                        <q-tooltip>이름 수정</q-tooltip>
-                      </q-btn>
-                    </div>
-
-                    <q-item-label v-else-if="!item.isNew" :class="{ 'text-grey-6': item.isDeleted, 'text-strike': item.isDeleted }">{{ item.name_ko }}</q-item-label>
-                  </q-item-section>
-
-                  <q-item-section side>
-                    <div class="row no-wrap items-center">
-                      <q-btn
-                        v-if="item.isNew && !item.isConfirmed"
-                        round dense flat icon="check"
-                        @click="resolveItem(item)"
-                        :disable="!item.name_ko"
+              <q-scroll-area class="col">
+                <q-list separator class="q-pt-none">
+                  <q-item 
+                    v-for="(item, index) in itemsInEditor" 
+                    :key="item.item_id || `new-${index}`" 
+                    :class="{ 'bg-grey-3': item.isDeleted, 'item-confirmed': item.isConfirmed }"
+                    :style="{ opacity: item.isDeleted ? 0.6 : 1 }"
+                    @mouseenter="editorHoveredIndex = index"
+                    @mouseleave="editorHoveredIndex = null"
+                  >
+                    <q-item-section>
+                      <!-- 이름 입력 UI (신규 또는 수정 시) -->
+                      <q-select
+                        :ref="(el) => { if (el) searchSelectRefs[index] = el }"
+                        v-if="(item.isNew && !item.isConfirmed) || item.isEditing"
+                        v-model="item.name_ko"
+                        :label="item.isNew ? '물품명 입력 후 Enter' : '물품명 수정 후 Enter'"
+                        autofocus dense use-input fill-input hide-selected
+                        :options="autocompleteSuggestions"
+                        @new-value="handleNewValue"
+                        new-value-mode="add-unique"
+                        @keyup.enter="handleEnterKey($event, index)"
+                        @input-value="(val) => item.name_ko = val"
+                        autocomplete="off"
                       >
-                        <q-tooltip>항목 확정</q-tooltip>
-                      </q-btn>
-                      <q-btn 
-                        v-if="item.isNew && item.isConfirmed"
-                        :icon="item.bbox ? 'replay' : 'edit_location'"
-                        flat round dense
-                        @click="activateDrawing(index)"
-                        :color="item.bbox ? 'positive' : (activeDrawIndex === index ? 'primary' : 'grey')"
-                        :disable="item.isDeleted"
-                      >
-                        <q-tooltip>{{ item.bbox ? '위치 다시 지정' : '위치 지정' }}</q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        :icon="item.isDeleted ? 'undo' : 'delete'"
-                        flat round dense
-                        @click="toggleDeleteItem(item)"
-                      >
-                        <q-tooltip>{{ item.isDeleted ? '복구' : '삭제' }}</q-tooltip>
-                      </q-btn>
-                    </div>
-                  </q-item-section>
-                </q-item>
-              </q-list>
+                        <template v-slot:no-option>
+                          <q-item><q-item-section class="text-grey">일치하는 항목이 없습니다.</q-item-section></q-item>
+                        </template>
+                      </q-select>
+
+                      <!-- 이름 텍스트 (확정 또는 기본 상태 시) -->
+                      <q-item-label v-if="!((item.isNew && !item.isConfirmed) || item.isEditing)" :class="{ 'text-grey-6': item.isDeleted, 'text-strike': item.isDeleted }">
+                        {{ item.name_ko }}
+                      </q-item-label>
+                    </q-item-section>
+
+                    <q-item-section side>
+                      <div class="row no-wrap items-center">
+
+                        <!-- For NEW items -->
+                        <template v-if="item.isNew">
+                          <q-btn
+                            v-if="!item.isConfirmed"
+                            icon="check_circle" flat round dense no-ripple
+                            @click="resolveItem(item)"
+                            :disable="!item.name_ko"
+                            class="action-btn action-btn--confirm"
+                          >
+                            <q-tooltip>항목 확정</q-tooltip>
+                          </q-btn>
+                          
+                          <q-btn
+                            v-if="item.isConfirmed && !item.isDeleted"
+                            :icon="item.bbox ? 'replay' : 'edit_location'"
+                            flat round dense no-ripple
+                            @click="startRedrawBbox(item, index)"
+                            :color="item.bbox ? 'positive' : (activeDrawIndex === index ? 'primary' : 'grey')"
+                          >
+                            <q-tooltip>{{ item.bbox ? '위치 다시 지정' : '위치 지정' }}</q-tooltip>
+                          </q-btn>
+
+                          <q-btn
+                            v-if="!item.isDeleted"
+                            icon="delete" flat round dense no-ripple
+                            @click="toggleDeleteItem(item)"
+                            class="action-btn action-btn--delete"
+                          >
+                            <q-tooltip>삭제</q-tooltip>
+                          </q-btn>
+                        </template>
+
+                        <!-- For EXISTING items -->
+                        <template v-if="!item.isNew">
+                          <!-- EDITING state -->
+                          <template v-if="item.isEditing">
+                            <q-btn
+                              icon="check_circle" flat round dense no-ripple
+                              @click="confirmItemEdit(item)"
+                              class="action-btn action-btn--confirm"
+                            >
+                              <q-tooltip>항목 확정</q-tooltip>
+                            </q-btn>
+                            <q-btn
+                              icon="cancel" flat round dense no-ripple
+                              @click="toggleEditMode(item)"
+                              class="action-btn action-btn--cancel"
+                            >
+                              <q-tooltip>수정 취소</q-tooltip>
+                            </q-btn>
+                            <q-btn
+                              icon="edit_location" flat round dense no-ripple
+                              @click="startRedrawBbox(item, index)"
+                              class="action-btn action-btn--location"
+                            >
+                              <q-tooltip>위치 다시 지정</q-tooltip>
+                            </q-btn>
+                          </template>
+                          <!-- NORMAL state -->
+                          <template v-else>
+                            <q-btn
+                              v-if="!item.isDeleted"
+                              icon="edit" flat round dense no-ripple
+                              @click="toggleEditMode(item)"
+                              class="action-btn action-btn--edit"
+                            >
+                              <q-tooltip>물품 수정</q-tooltip>
+                            </q-btn>
+                          </template>
+
+                          <!-- Delete/Restore button (always visible for existing items) -->
+                          <q-btn
+                            :icon="item.isDeleted ? 'undo' : 'delete'" flat round dense no-ripple
+                            @click="toggleDeleteItem(item)"
+                            :class="item.isDeleted ? 'action-btn action-btn--undo' : 'action-btn action-btn--delete'"
+                          >
+                            <q-tooltip>{{ item.isDeleted ? '복구' : '삭제' }}</q-tooltip>
+                          </q-btn>
+                        </template>
+
+                      </div>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </q-scroll-area>
             </q-card>
           </div>
         </q-card-section>
@@ -305,10 +395,12 @@ import { ref, onMounted, onUnmounted, computed, nextTick, onBeforeUpdate } from 
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import ClassificationToast from './ClassificationToast.vue'
+import { useAuth } from '~/composables/useAuth'
 
 const $q = useQuasar()
 const route = useRoute()
 const router = useRouter()
+const { user } = useAuth()
 
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -341,24 +433,71 @@ const drawStartPoint = ref({ x: 0, y: 0 })
 const drawingRect = ref({ x: 0, y: 0, width: 0, height: 0 })
 const activeDrawIndex = ref(null)
 
-// BBox 스타일 계산 로직을 공통 함수로 추출
-const calculateBoxStyle = (bbox, containerEl, imageSize) => {
-  if (!bbox || !containerEl) return {};
-  
-  const container = containerEl.getBoundingClientRect();
-  const containerRatio = container.width / container.height;
-  const imageRatio = imageSize.width / imageSize.height;
+// --- Destination State ---
+const showDestinationInput = ref(false)
+const destination = ref('')
+const isSaveButtonVisible = ref(true)
 
-  let scale = 1, offsetX = 0, offsetY = 0;
+
+// BBox 스타일 계산 로직을 공통 함수로 추출
+const calculateBoxStyleForMain = (bbox, containerEl) => {
+  if (!bbox || !containerEl) return { display: 'none' };
+
+  const imgEl = containerEl.querySelector('img');
+  if (!imgEl) return { display: 'none' };
+
+  // Get rendered dimensions of the image
+  const displayedWidth = imgEl.clientWidth;
+  const displayedHeight = imgEl.clientHeight;
+
+  // Get position of image and container relative to viewport
+  const imgRect = imgEl.getBoundingClientRect();
+  const containerRect = containerEl.getBoundingClientRect();
+
+  // Calculate the offset of the image relative to the container
+  const offsetX = imgRect.left - containerRect.left;
+  const offsetY = imgRect.top - containerRect.top;
+
+  const [x_min_norm, y_min_norm, x_max_norm, y_max_norm] = bbox;
+
+  const left = offsetX + (x_min_norm * displayedWidth);
+  const top = offsetY + (y_min_norm * displayedHeight);
+  const width = (x_max_norm - x_min_norm) * displayedWidth;
+  const height = (y_max_norm - y_min_norm) * displayedHeight;
+
+  return {
+    position: 'absolute',
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+  };
+};
+
+
+const calculateBoxStyleForModal = (bbox, containerEl, imageSize) => {
+  if (!bbox || !containerEl || !imageSize || imageSize.width === 1) return {};
+
+  const containerRect = containerEl.getBoundingClientRect();
+  if (containerRect.width === 0) return {};
+
+  const imageRatio = imageSize.width / imageSize.height;
+  const containerRatio = containerRect.width / containerRect.height;
+
+  let scale = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+
   if (imageRatio > containerRatio) {
-    scale = container.width / imageSize.width;
-    offsetY = (container.height - imageSize.height * scale) / 2;
+    scale = containerRect.width / imageSize.width;
+    offsetY = (containerRect.height - (imageSize.height * scale)) / 2;
   } else {
-    scale = container.height / imageSize.height;
-    offsetX = (container.width - imageSize.width * scale) / 2;
+    scale = containerRect.height / imageSize.height;
+    offsetX = (containerRect.width - (imageSize.width * scale)) / 2;
   }
 
   const [x_min, y_min, x_max, y_max] = bbox;
+
   return {
     position: 'absolute',
     left: `${(x_min * imageSize.width * scale) + offsetX}px`,
@@ -376,18 +515,76 @@ const drawingRectStyle = computed(() => ({
   height: `${drawingRect.value.height}px`,
 }))
 
-const openEditModal = () => {
-  itemsInEditor.value = JSON.parse(JSON.stringify(detectionResults.value)).map(item => ({ ...item, isDeleted: false }))
-  showEditModal.value = true
+const openEditModal = async () => {
+  try {
+    const response = await fetch(`http://${window.location.hostname}:5001/api/items/results/${imageId.value}`);
+    if (!response.ok) {
+      throw new Error('최신 물품 정보를 불러오는 데 실패했습니다.');
+    }
+    const latestResultsWithAbsoluteBbox = await response.json();
+
+    const normalizedResults = latestResultsWithAbsoluteBbox.map(item => {
+      if (item.bbox && originalImageSize.value.width > 1) {
+        const [x_min, y_min, x_max, y_max] = item.bbox;
+        const { width, height } = originalImageSize.value;
+        return {
+          ...item,
+          bbox: [x_min / width, y_min / height, x_max / width, y_max / height]
+        };
+      }
+      return item;
+    });
+
+    detectionResults.value = normalizedResults;
+
+    itemsInEditor.value = JSON.parse(JSON.stringify(normalizedResults)).map(item => ({ 
+      ...item, 
+      isDeleted: false, 
+      isEditing: false, 
+      isDrawingBbox: false, 
+      originalName: item.name_ko
+    }));
+    showEditModal.value = true;
+
+  } catch (error) {
+    console.error('Error opening edit modal:', error);
+    $q.notify({ type: 'negative', message: error.message || '오류가 발생했습니다.' });
+  }
 }
 
 const addNewItem = () => {
   if (itemsInEditor.value.some(item => item.isNew && !item.isConfirmed)) return;
-  itemsInEditor.value.unshift({ isNew: true, name_ko: '', bbox: null, isDeleted: false, isConfirmed: false });
+  itemsInEditor.value.unshift({ isNew: true, name_ko: '', bbox: null, isDeleted: false, isConfirmed: false, isEditing: false, isDrawingBbox: false });
 }
 
 const toggleDeleteItem = (item) => {
   item.isDeleted = !item.isDeleted
+}
+
+const toggleEditMode = (item) => {
+  item.isEditing = !item.isEditing;
+  // 수정 취소 시, 원래 이름으로 복원
+  if (!item.isEditing) {
+    item.name_ko = item.originalName;
+  }
+}
+
+const confirmItemEdit = (item) => {
+  if (!item.name_ko) {
+    $q.notify({ message: '물품명을 입력하거나 선택해주세요.', color: 'warning' });
+    return;
+  }
+  item.isEditing = false;
+  // item.originalName = item.name_ko; // This is the bug. Do not update originalName here.
+}
+
+const startRedrawBbox = (item, index) => {
+  item.isDrawingBbox = true;
+  item.bbox = null; // 이전 bbox를 즉시 제거
+  // 이전 bbox가 사라지는 DOM 업데이트를 기다린 후 그리기 모드 활성화
+  nextTick(() => {
+    activateDrawing(index);
+  });
 }
 
 const activateDrawing = (index) => {
@@ -423,7 +620,6 @@ const handleMouseMove = (e) => {
   drawingRect.value.height = Math.abs(currentY - startY)
 }
 
-// 그려진 BBox를 정규화된 좌표로 변환하는 함수
 const normalizeBbox = (drawnRect, containerEl, imageSize) => {
   if (!drawnRect || !containerEl) return null;
 
@@ -456,7 +652,6 @@ const normalizeBbox = (drawnRect, containerEl, imageSize) => {
   ];
 }
 
-// BBox 좌표 저장 로직 수정
 const handleMouseUp = () => {
   if (!isDrawing.value || activeDrawIndex.value === null) return;
   isDrawing.value = false;
@@ -468,13 +663,17 @@ const handleMouseUp = () => {
     item.bbox = normalized;
   }
 
+  // 그리기 상태 종료
+  if (item) {
+    item.isDrawingBbox = false;
+  }
   activeDrawIndex.value = null;
   drawingRect.value = { x: 0, y: 0, width: 0, height: 0 };
 };
 
 // 수정: 공통 함수를 사용하도록 변경
 const getEditorBoxStyle = (bbox) => {
-  return calculateBoxStyle(bbox, editorImageContainer.value, originalImageSize.value);
+  return calculateBoxStyleForModal(bbox, editorImageContainer.value, originalImageSize.value);
 }
 
 const saveChanges = async () => {
@@ -484,15 +683,53 @@ const saveChanges = async () => {
     try {
         const itemsToAdd = itemsInEditor.value.filter(item => item.isNew && item.isConfirmed && !item.isDeleted && item.name_ko && item.bbox);
         const itemsToDelete = itemsInEditor.value.filter(item => !item.isNew && item.isDeleted);
+        const itemsToUpdate = itemsInEditor.value.filter(item => 
+          !item.isNew && 
+          !item.isDeleted && 
+          (item.name_ko !== item.originalName || JSON.stringify(item.bbox) !== JSON.stringify(detectionResults.value.find(d => d.item_id === item.item_id)?.bbox))
+        );
 
-        if (itemsToAdd.length === 0 && itemsToDelete.length === 0) {
+        if (itemsToAdd.length === 0 && itemsToDelete.length === 0 && itemsToUpdate.length === 0) {
             $q.notify({ message: '변경 사항이 없습니다.', color: 'info' });
             return;
         }
 
         let currentResults = [...detectionResults.value];
 
-        // 1. 삭제 API 순차적 호출
+        // 1. Update API 호출 (가장 먼저 처리)
+        if (itemsToUpdate.length > 0) {
+            const updatePayload = {
+                image_id: imageId.value,
+                items_to_update: itemsToUpdate.map(item => {
+                    const denormalizedBbox = item.bbox ? [
+                        item.bbox[0] * originalImageSize.value.width,
+                        item.bbox[1] * originalImageSize.value.height,
+                        item.bbox[2] * originalImageSize.value.width,
+                        item.bbox[3] * originalImageSize.value.height
+                    ] : null;
+
+                    return {
+                        item_id: item.item_id,
+                        name_ko: item.name_ko,
+                        bbox: denormalizedBbox
+                    };
+                })
+            };
+
+            const response = await fetch('http://' + window.location.hostname + ':5001/api/items/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatePayload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || '수정 중 오류가 발생했습니다.');
+            }
+            currentResults = await response.json();
+        }
+
+        // 2. 삭제 API 순차적 호출
         if (itemsToDelete.length > 0) {
             const deletePayload = {
                 image_id: imageId.value,
@@ -511,11 +748,22 @@ const saveChanges = async () => {
             currentResults = await response.json();
         }
 
-        // 2. 추가 API 순차적 호출
+        // 3. 추가 API 순차적 호출
         if (itemsToAdd.length > 0) {
             const addPayload = {
                 image_id: imageId.value,
-                new_items: itemsToAdd.map(item => ({ name_ko: item.name_ko, bbox: item.bbox }))
+                new_items: itemsToAdd.map(item => {
+                    const denormalizedBbox = item.bbox ? [
+                        item.bbox[0] * originalImageSize.value.width,
+                        item.bbox[1] * originalImageSize.value.height,
+                        item.bbox[2] * originalImageSize.value.width,
+                        item.bbox[3] * originalImageSize.value.height
+                    ] : null;
+                    return {
+                        name_ko: item.name_ko,
+                        bbox: denormalizedBbox
+                    };
+                })
             };
             const response = await fetch('http://' + window.location.hostname + ':5001/api/items/add', {
                 method: 'POST',
@@ -530,8 +778,18 @@ const saveChanges = async () => {
             currentResults = await response.json();
         }
 
-        // 3. 최종 결과로 UI 업데이트
-        detectionResults.value = currentResults;
+        // 최종 결과로 UI 업데이트
+        detectionResults.value = currentResults.map(item => {
+          if (item.bbox && originalImageSize.value.width > 1) {
+            const [x_min, y_min, x_max, y_max] = item.bbox;
+            const { width, height } = originalImageSize.value;
+            return {
+              ...item,
+              bbox: [x_min / width, y_min / height, x_max / width, y_max / height]
+            };
+          }
+          return item;
+        });
 
         $q.notify({ message: '성공적으로 저장되었습니다.', color: 'positive', icon: 'check' });
 
@@ -580,7 +838,7 @@ const handleEnterKey = async (event, index) => {
 
   if (selectComponent && currentInputValue) {
     try {
-      const response = await fetch('http://' + window.location.hostname + ':5001/api/items/autocomplete?q=${currentInputValue}');
+            const response = await fetch(`http://${window.location.hostname}:5001/api/items/autocomplete?q=${currentInputValue}`);
       if (!response.ok) throw new Error('Network response was not ok');
       
       const suggestions = await response.json();
@@ -701,30 +959,23 @@ onBeforeUpdate(() => {
 });
 
 onMounted(() => {
-  if (route.query.results) {
-    try {
-      const resultData = JSON.parse(route.query.results);
-      detectionResults.value = resultData.results || [];
-      imageId.value = resultData.image_id;
-      originalImageSize.value = resultData.image_size || { width: 1, height: 1 };
-    } catch (e) {
-      console.error("Error parsing results JSON:", e);
-      detectionResults.value = [];
+  const resultsData = route.query.results ? JSON.parse(route.query.results) : null;
+
+  if (resultsData) {
+    detectionResults.value = resultsData.results || [];
+    imageId.value = resultsData.image_id;
+    originalImageSize.value = resultsData.image_size || { width: 1, height: 1 };
+    // 분류 결과에 포함된 실제 이미지 URL을 우선적으로 사용
+    if (resultsData.image_url) {
+      imageUrl.value = resultsData.image_url;
     }
   }
-  if (route.query.image) {
+
+  // 실제 이미지 URL이 없는 경우에만 blob URL을 사용 (폴백)
+  if (!imageUrl.value && route.query.image) {
     imageUrl.value = route.query.image;
-  } else if (route.query.results) {
-    // results 데이터에서 이미지 URL 추출 시도
-    try {
-      const resultData = JSON.parse(route.query.results);
-      if (resultData.image_url) {
-        imageUrl.value = resultData.image_url;
-      }
-    } catch (e) {
-      console.error("Error extracting image URL from results:", e);
-    }
   }
+
   isLoading.value = false;
 
   // 페이드 인 애니메이션
@@ -765,32 +1016,36 @@ const selectNewImage = () => {
 }
 
 // 분석 결과 저장 함수
-const saveAnalysisResults = async (event) => {
-  console.log('=== 저장 함수 호출됨 ===');
-  console.log('이벤트:', event);
-  console.log('isSavingResults.value:', isSavingResults.value);
-  console.log('detectionResults.value:', detectionResults.value);
-  
-  // 이벤트 전파 중지
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-  
-  if (isSavingResults.value) {
-    console.log('이미 저장 중이므로 리턴');
+const saveAnalysisResults = async () => {
+  if (isSavingResults.value) return;
+
+  if (!destination.value) {
+    $q.notify({
+      type: 'warning',
+      message: '여행지를 입력해주세요.',
+      position: 'top'
+    });
     return;
   }
   
   isSavingResults.value = true;
-  console.log('저장 중...');
   
   try {
-    // 분석 결과 데이터 구성
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      throw new Error('인증 토큰을 찾을 수 없습니다. 다시 로그인해주세요.');
+    }
+
+    const storedUser = JSON.parse(localStorage.getItem('user'));
+    if (!storedUser || !storedUser.id) {
+        throw new Error('사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.');
+    }
+
+    const realImageUrl = JSON.parse(route.query.results)?.image_url || imageUrl.value;
+
     const analysisData = {
-      user_id: 'custom1', // 실제로는 인증된 사용자 ID 사용
+      user_id: storedUser.id,
       image_id: imageId.value,
-      image_url: imageUrl.value,
       image_size: originalImageSize.value,
       detected_items: detectionResults.value.map(item => ({
         name_ko: item.name_ko,
@@ -804,14 +1059,15 @@ const saveAnalysisResults = async (event) => {
         bbox: item.bbox
       })),
       total_items: detectionResults.value.length,
-      analysis_date: new Date().toISOString()
+      analysis_date: new Date().toISOString(),
+      destination: destination.value
     };
 
-    // 백엔드에 저장 요청
     const response = await fetch('http://' + window.location.hostname + ':5001/api/analysis/save', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(analysisData)
     });
@@ -822,18 +1078,16 @@ const saveAnalysisResults = async (event) => {
     }
 
     const result = await response.json();
-    console.log('저장 성공 응답:', result);
     
-    // 저장 성공 토스트 표시
     toastTitle.value = '저장 완료'
     toastMessage.value = `분석 결과가 성공적으로 저장되었습니다. (총 ${detectionResults.value.length}개 물품)`
     showToast.value = true
     
-    console.log('토스트 메시지 표시 완료');
+    showDestinationInput.value = false;
+    destination.value = '';
 
   } catch (error) {
     console.error('Error saving analysis results:', error);
-    // 저장 실패 토스트 표시
     toastTitle.value = '저장 실패'
     toastMessage.value = `저장 중 오류가 발생했습니다: ${error.message}`
     showToast.value = true
@@ -894,5 +1148,95 @@ onUnmounted(() => {
   font-size: 0.7rem;
   width: 35px;
   text-align: center;
+}
+
+.control-btn--confirm:hover {
+  background-color: rgba(46, 125, 50, 0.1);
+  color: #2e7d32;
+}
+.control-btn--edit:hover {
+  background-color: rgba(25, 118, 210, 0.1);
+  color: #1976d2;
+}
+.control-btn--delete:hover {
+  background-color: rgba(211, 47, 47, 0.1);
+  color: #d32f2f;
+}
+.control-btn--undo:hover {
+  background-color: rgba(2, 136, 209, 0.1);
+  color: #0288d1;
+}
+
+/* Action Button Styles in Modal */
+.action-btn {
+  position: relative;
+  overflow: hidden;
+  transition: color 0.3s;
+  padding: 6px 12px !important;
+  min-height: auto !important;
+  height: auto !important;
+  border-radius: 4px !important;
+}
+
+.action-btn::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0; top: 100%;
+  transition: top 0.2s cubic-bezier(0.4,0,0.2,1);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.action-btn:hover::after {
+  top: 0;
+}
+
+.action-btn .q-btn__content {
+  position: relative;
+  z-index: 2;
+}
+
+/* Edit & Location */
+.action-btn--edit, .action-btn--location {
+  color: #1976d2;
+}
+.action-btn--edit:hover, .action-btn--location:hover {
+  color: white !important;
+}
+.action-btn--edit::after, .action-btn--location::after {
+  background: #1976d2;
+}
+
+/* Confirm */
+.action-btn--confirm {
+  color: #2e7d32;
+}
+.action-btn--confirm:hover {
+  color: white !important;
+}
+.action-btn--confirm::after {
+  background: #2e7d32;
+}
+
+/* Cancel & Delete */
+.action-btn--cancel, .action-btn--delete {
+  color: #d32f2f;
+}
+.action-btn--cancel:hover, .action-btn--delete:hover {
+  color: white !important;
+}
+.action-btn--cancel::after, .action-btn--delete::after {
+  background: #d32f2f;
+}
+
+/* Undo */
+.action-btn--undo {
+  color: #ed6c02;
+}
+.action-btn--undo:hover {
+  color: white !important;
+}
+.action-btn--undo::after {
+  background: #ed6c02;
 }
 </style>

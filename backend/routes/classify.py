@@ -1,5 +1,6 @@
 # backend/routes/classify.py
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from sku.detect import predict_bbox_with_sku, save_cropped_images
 from yolo.detect import predict_name_with_yolo
 from db.database_utils import fetch_item_info, insert_image, insert_detected_item
@@ -23,7 +24,7 @@ def run_detection(img_bytes, conn, image_id, img_width, img_height):
     # YOLO 모델로 객체 분류
     yolo_predictions = predict_name_with_yolo(img_bytes, bboxes)
     print(f"[DETECTION] YOLO classified {len(yolo_predictions)} objects")
-
+    """
     # 크롭 이미지 저장 (성능 개선을 위한 중요한 기능)
     if bboxes:
         try:
@@ -31,7 +32,7 @@ def run_detection(img_bytes, conn, image_id, img_width, img_height):
             print(f"[DETECTION] Saved {len(bboxes)} cropped images")
         except Exception as e:
             print(f"[DETECTION WARNING] Failed to save cropped images: {e}")
-
+    """
     enriched_results = []
 
     for i, p in enumerate(yolo_predictions):
@@ -73,7 +74,11 @@ def run_detection(img_bytes, conn, image_id, img_width, img_height):
 
 
 @classify_bp.route("/classify", methods=["POST"])
+@jwt_required()
 def classify():
+    # JWT 토큰에서 사용자 ID 가져오기
+    user_id = get_jwt_identity()
+
     if "image" not in request.files:
         return jsonify({"error": "No image uploaded"}), 400
 
@@ -96,8 +101,8 @@ def classify():
             # 트랜잭션 시작
             conn.begin()
             
-            # 이미지 저장
-            image_id = insert_image("custom1", img_bytes, img_width, img_height, conn)
+            # 이미지 저장 (JWT에서 얻은 user_id 사용)
+            image_id = insert_image(user_id, img_bytes, img_width, img_height, conn)
 
             # 탐지 및 분류 실행
             results = run_detection(img_bytes, conn, image_id, img_width, img_height)

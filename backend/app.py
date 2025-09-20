@@ -14,6 +14,8 @@ from service.user_service import UserService, UserExistsException, InvalidCreden
 from routes.classify import classify_bp
 from routes.items import items_bp
 from routes.analysis import analysis_bp
+from routes.weight import weight_bp
+from routes.category import category_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -28,6 +30,8 @@ CORS(app, origins=Config.CORS_ORIGINS, supports_credentials=True)
 app.register_blueprint(classify_bp)
 app.register_blueprint(items_bp)
 app.register_blueprint(analysis_bp)
+app.register_blueprint(weight_bp)
+app.register_blueprint(category_bp)
 
 # Redis 연결
 redis_client = redis.from_url(Config.REDIS_URL)
@@ -128,6 +132,19 @@ def init_db():
             FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     """)
+
+    # Schema migration: items 테이블에 category 컬럼이 없는 경우 추가
+    db_name = conn.db.decode() if isinstance(conn.db, bytes) else conn.db
+    cursor.execute("""
+        SELECT COUNT(*) as cnt
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = %s
+        AND TABLE_NAME = 'items'
+        AND COLUMN_NAME = 'category'
+    """, (db_name,))
+    if cursor.fetchone()['cnt'] == 0:
+        cursor.execute("ALTER TABLE items ADD COLUMN category VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL")
+        print("[DB MIGRATION] 'category' column added to 'items' table.")
     
     conn.commit()
     cursor.close()

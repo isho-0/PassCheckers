@@ -53,7 +53,7 @@ MANIFEST
 
 # Virtual environments
 backend/venv/
-venv/
+virtualenv/
 ENV/
 env/
 .venv/
@@ -70,3 +70,9 @@ backend/models/pytorch/*.pt
 
 # OS
 Thumbs.db
+
+# result cropped images
+static\results\
+
+# Generated thumbnails
+backend/static/thumbnails/

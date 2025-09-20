@@ -166,6 +166,13 @@ const processFile = async (file) => {
   isUploading.value = true
 
   try {
+    // 로컬 스토리지에서 인증 토큰 가져오기
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      // 토큰이 없으면 로그인 페이지로 리디렉션하거나 에러 메시지 표시
+      throw new Error('인증 토큰을 찾을 수 없습니다. 다시 로그인해주세요.');
+    }
+
     // FormData 생성
     const formData = new FormData()
     formData.append('image', file)
@@ -173,10 +180,16 @@ const processFile = async (file) => {
     // 백엔드로 이미지 업로드 및 분류 요청
     const response = await fetch('http://' + window.location.hostname + ':5001/classify', {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
       body: formData
     })
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('인증이 만료되었거나 유효하지 않습니다. 다시 로그인해주세요.');
+      }
       throw new Error('분류 요청에 실패했습니다.')
     }
 

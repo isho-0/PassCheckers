@@ -4,6 +4,9 @@ from matching.item_service import item_service
 from models.item_model import ItemModel
 from models.detected_item_model import DetectedItemModel
 from services import gemini_service
+from flask import send_file
+from db.database_utils import get_db_connection
+import io
 
 items_bp = Blueprint('items_bp', __name__, url_prefix='/api/items')
 
@@ -73,28 +76,43 @@ def add_detected_items():
                 print(f"[ADD API] Item '{item_name_ko}' not found in DB and no high-score match. Calling Gemini...")
                 gemini_data = gemini_service.get_item_info_from_gemini(item_name_ko)
                 
-                if gemini_data:
+                if gemini_data and 'item_data' in gemini_data and 'weight_data' in gemini_data:
                     print(f"[ADD API] Gemini returned data for '{item_name_ko}'. Adding to ItemModel...")
-                    item_details = ItemModel.add_item_from_api(gemini_data)
+                    # Gemini로부터 받은 중첩된 데이터를 각 부분으로 분리합니다.
+                    item_data_from_gemini = gemini_data['item_data']
+                    weight_data_from_gemini = gemini_data['weight_data']
+                    
+                    # add_item_from_api가 올바른 데이터를 받도록 수정하고, 반환된 상세 정보를 item_details에 저장합니다.
+                    item_details = ItemModel.add_item_from_api(item_data_from_gemini, weight_data_from_gemini)
                 else:
-                    print(f"[ADD API] Gemini could not provide data for '{item_name_ko}'. Skipping.")
+                    print(f"[ADD API] Gemini could not provide valid data for '{item_name_ko}'. Skipping.")
                     continue
 
+            # item_details가 딕셔너리 형태인지 확인하고 packing_info를 설정합니다.
             packing_info = 'none'
-            if item_details['carry_on_allowed'] == '예' and item_details['checked_baggage_allowed'] == '예':
-                packing_info = 'both'
-            elif item_details['carry_on_allowed'] == '예':
-                packing_info = 'carry_on'
-            elif item_details['checked_baggage_allowed'] == '예':
-                packing_info = 'checked'
-
-            DetectedItemModel.add_item(
-                image_id=image_id,
-                item_name=item_name_ko,
-                bbox=item_data['bbox'],
-                item_name_EN=item_details['item_name_EN'],
-                packing_info=packing_info
-            )
+            if isinstance(item_details, dict):
+                carry_on = item_details.get('carry_on_allowed', '아니요')
+                checked = item_details.get('checked_baggage_allowed', '아니요')
+                
+                if carry_on.startswith('예') and checked.startswith('예'):
+                    packing_info = 'both'
+                elif carry_on.startswith('예'):
+                    packing_info = 'carry_on'
+                elif checked.startswith('예'):
+                    packing_info = 'checked'
+            
+                # DetectedItemModel.add_item을 호출할 때, item_details에서 직접 값을 가져옵니다.
+                DetectedItemModel.add_item(
+                    image_id=image_id,
+                    item_name=item_name_ko,
+                    bbox=item_data['bbox'],
+                    item_name_EN=item_details.get('item_name_EN', ''),
+                    packing_info=packing_info
+                )
+            else:
+                # item_details가 예상치 못한 형식일 경우를 대비한 로깅
+                print(f"[ADD API] Failed to get valid details for '{item_name_ko}'. Skipping DetectedItemModel.add_item.")
+                continue
 
         # 모든 작업 후, 상세 정보가 포함된 최신 목록을 가져옵니다.
         all_detected_items = DetectedItemModel.get_detailed_by_image_id(image_id)
@@ -103,8 +121,34 @@ def add_detected_items():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        print(f"[ADD API] Server error: {e}")
+        print(f"[RESULTS API] Server error: {e}")
         return jsonify({"error": "서버 내부 오류가 발생했습니다."}), 500
+
+@items_bp.route('/image/<int:image_id>', methods=['GET'])
+def get_image_by_id(image_id):
+    """ID를 기반으로 원본 이미지 데이터를 반환합니다."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT image_data FROM images WHERE image_id = %s", (image_id,))
+            result = cursor.fetchone()
+            
+            if result and result['image_data']:
+                # image_data (BLOB)를 BytesIO로 감싸서 send_file로 보냅니다.
+                return send_file(
+                    io.BytesIO(result['image_data']),
+                    mimetype='image/jpeg',  # 혹은 저장된 이미지 타입에 맞게 변경
+                    as_attachment=False
+                )
+            else:
+                return jsonify({"error": "이미지를 찾을 수 없습니다."}), 404
+    except Exception as e:
+        print(f"[IMAGE API] Server error: {e}")
+        return jsonify({"error": "이미지 조회 중 오류 발생"}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @items_bp.route('/delete', methods=['POST'])
 def delete_detected_items():
@@ -126,6 +170,34 @@ def delete_detected_items():
 
     except Exception as e:
         return jsonify({"error": "서버 내부 오류가 발생했습니다."}), 500
+
+@items_bp.route('/update', methods=['POST'])
+def update_detected_items():
+    """탐지된 아이템의 이름 또는 bbox를 수정합니다."""
+    data = request.get_json()
+    print(f"[UPDATE API] Received data: {data}")
+    if not data or 'image_id' not in data or 'items_to_update' not in data:
+        return jsonify({"error": "image_id와 items_to_update가 필요합니다."}), 400
+
+    image_id = data['image_id']
+    items_to_update = data['items_to_update']
+
+    try:
+        # 이 부분은 서비스 레이어로 분리하는 것이 더 좋습니다.
+        for item_data in items_to_update:
+            item_service.update_detected_item(
+                item_id=item_data['item_id'],
+                new_name_ko=item_data['name_ko'],
+                new_bbox=item_data.get('bbox')
+            )
+
+        # 모든 작업 후, 상세 정보가 포함된 최신 목록을 가져옵니다.
+        all_detected_items = DetectedItemModel.get_detailed_by_image_id(image_id)
+        return jsonify(all_detected_items), 200
+
+    except Exception as e:
+        print(f"[UPDATE API] Server error: {e}")
+        return jsonify({"error": "아이템 수정 중 서버 오류가 발생했습니다."}), 500
 
 @items_bp.route('/results/<int:image_id>', methods=['GET'])
 def get_results_by_image_id(image_id):

@@ -1,6 +1,8 @@
 # backend/matching/item_service.py
 
 from models.item_model import ItemModel
+from models.detected_item_model import DetectedItemModel
+from services import gemini_service
 from rapidfuzz import process, fuzz
 import threading
 import time
@@ -61,11 +63,8 @@ class ItemService:
 
         self._check_and_refresh_cache()
         
-        # WRatio 스코어 75점 이상인 항목만 반환하도록 score_cutoff 값을 상향 조정합니다.
-        # limit은 여전히 5로 유지하여, 최대 5개의 가장 유사한 항목만 가져옵니다.
         results = process.extract(query, self.item_names, scorer=fuzz.WRatio, limit=limit, score_cutoff=75)
 
-        # 결과는 (찾은문자열, 점수, 인덱스) 튜플의 리스트이므로, 문자열만 추출합니다.
         return [result[0] for result in results]
     
     def find_best_match(self, query, threshold=30):
@@ -75,11 +74,9 @@ class ItemService:
 
         self._check_and_refresh_cache()
         
-        # 가장 유사한 항목 1개를 찾습니다.
         result = process.extractOne(query, self.item_names, scorer=fuzz.WRatio, score_cutoff=threshold)
         if result:
-            match_name, score, _ = result  # score는 0-100 스케일
-            # 캐시된 맵을 사용해 ID를 즉시 찾습니다.
+            match_name, score, _ = result
             item_id = self._name_to_id_map.get(match_name)
             return {
                 "name": match_name,
@@ -87,6 +84,68 @@ class ItemService:
                 "id": item_id
             }
         return None
+
+    def update_detected_item(self, item_id, new_name_ko, new_bbox):
+        """탐지된 아이템의 이름 및/또는 bbox를 업데이트합니다."""
+        detected_item = DetectedItemModel.get_by_id(item_id)
+        if not detected_item:
+            raise ValueError(f"Detected item with id {item_id} not found.")
+
+        updates = {}
+        if new_bbox and new_bbox != detected_item.get('bbox'):
+            updates['bbox'] = new_bbox
+
+        # 이름이 변경된 경우, 새 물품 정보를 찾아야 합니다.
+        if new_name_ko and new_name_ko != detected_item.get('item_name'):
+            updates['name_ko'] = new_name_ko
+            
+            # 1. 새 이름으로 items 테이블에서 조회
+            item_details = ItemModel.get_by_name(new_name_ko)
+
+            # 2. 없으면, 유사한 이름으로 조회
+            if not item_details:
+                best_match_result = self.find_best_match(new_name_ko)
+                if best_match_result and best_match_result['score'] >= 90:
+                    item_details = ItemModel.get_by_name(best_match_result['name'])
+
+            # 3. 그래도 없으면, Gemini API 호출
+            if not item_details:
+                print(f"[Update Service] Item '{new_name_ko}' not found. Calling Gemini...")
+                gemini_data = gemini_service.get_item_info_from_gemini(new_name_ko)
+                if gemini_data and 'item_data' in gemini_data and 'weight_data' in gemini_data:
+                    item_details = ItemModel.add_item_from_api(
+                        gemini_data['item_data'], 
+                        gemini_data['weight_data']
+                    )
+                    # 캐시 새로고침
+                    self._load_cache()
+                else:
+                    # Gemini 실패 시, 업데이트를 중단하거나 기본값으로 처리할 수 있습니다.
+                    # 여기서는 일단 이름만 업데이트하고 나머지 정보는 비우는 것으로 처리합니다.
+                    print(f"[Update Service] Gemini failed for '{new_name_ko}'. Updating name only.")
+                    updates['item_name_EN'] = ''
+                    updates['packing_info'] = 'none'
+                    DetectedItemModel.update_details(item_id, updates)
+                    return
+
+            # 새 물품 정보로 업데이트할 내용을 설정합니다.
+            if item_details:
+                packing_info = 'none'
+                carry_on = item_details.get('carry_on_allowed', '아니요')
+                checked = item_details.get('checked_baggage_allowed', '아니요')
+                if carry_on.startswith('예') and checked.startswith('예'):
+                    packing_info = 'both'
+                elif carry_on.startswith('예'):
+                    packing_info = 'carry_on'
+                elif checked.startswith('예'):
+                    packing_info = 'checked'
+                
+                updates['item_name_EN'] = item_details.get('item_name_EN')
+                updates['packing_info'] = packing_info
+
+        # 변경 사항이 있을 경우에만 DB 업데이트를 수행합니다.
+        if updates:
+            DetectedItemModel.update_details(item_id, updates)
 
 # 싱글톤 인스턴스
 item_service = ItemService()

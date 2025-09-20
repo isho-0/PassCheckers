@@ -150,3 +150,56 @@ p {
   border-color: #1565c0 !important;
   color: #fff !important;
 } 
+
+/* Custom styles for season buttons in weight.vue */
+.season-btn {
+  border-radius: 16px !important;
+  border: 1px solid #e0e0e0 !important;
+  background: #fff !important;
+}
+
+/* --- HOVER STATE --- */
+/* Override the hover text color */
+.season-btn.summer:hover {
+  color: #D32F2F !important;
+}
+.season-btn.autumn:hover {
+  color: #FFA000 !important;
+}
+.season-btn.winter:hover {
+  color: #0288D1 !important;
+}
+
+/* Override the hover animation background (slightly darker pastels) */
+.season-btn.summer::after {
+  background: #ffcdd2 !important; /* Darker pastel pink */
+}
+.season-btn.autumn::after {
+  background: #ffecb3 !important; /* Darker pastel yellow */
+}
+.season-btn.winter::after {
+  background: #b3e5fc !important; /* Darker pastel blue */
+}
+
+/* --- SELECTED STATE --- */
+/* Use the original, lighter pastel colors */
+.season-btn.summer.selected {
+  background: #FFEBEE !important;
+  border-color: #FFCDD2 !important;
+  color: #D32F2F !important;
+}
+.season-btn.autumn.selected {
+  background: #FFF8E1 !important;
+  border-color: #FFECB3 !important;
+  color: #FFA000 !important;
+}
+.season-btn.winter.selected {
+  background: #E1F5FE !important;
+  border-color: #B3E5FC !important;
+  color: #0288D1 !important;
+}
+
+/* Hide the animation for selected buttons to show the static background color */
+.season-btn.selected::after {
+  display: none !important;
+}

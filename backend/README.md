@@ -78,6 +78,23 @@ python app.py
 ### 시스템
 - `GET /api/health` - 서버 상태 확인
 
+### 아이템/이미지 관련
+- `GET /api/items/image/<image_id>` - ID에 해당하는 원본 이미지를 반환합니다.
+- `GET /api/items/all` - DB에 저장된 모든 품목 정보를 가져옵니다.
+- `GET /api/items/autocomplete` - 품목 검색 시 자동완성 목록을 제공합니다.
+- `POST /api/items/match` - 텍스트와 가장 유사한 품목을 찾습니다.
+- `POST /api/items/add` - 이미지에 새로운 품목 정보를 추가합니다.
+- `POST /api/items/delete` - 이미지에서 품목 정보를 삭제합니다.
+- `GET /api/items/results/<image_id>` - 특정 이미지의 모든 품목 분석 결과를 가져옵니다.
+
+### 이미지 분류
+- `POST /classify` - 이미지를 업로드하여 품목을 분류합니다.
+
+### 분석 결과 관련
+- `POST /api/analysis/save` - 이미지 분석 결과를 DB에 저장합니다.
+- `GET /api/analysis/history/<user_id>` - 특정 사용자의 모든 분석 기록을 가져옵니다.
+- `GET /api/analysis/detail/<analysis_id>` - 특정 분석 기록의 상세 정보를 가져옵니다.
+
 ## 환경 변수
 
 - `SECRET_KEY`: Flask 시크릿 키
@@ -87,7 +104,7 @@ python app.py
 
 ## 개발 환경
 
-- Python 3.8+
+- Python 3.10+
 - Flask 3.0.0
-- MySQL
+- MySQL 8.0.35
 - Redis 
