@@ -13,6 +13,8 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@amcharts/amcharts5": "^5.13.6",
+    "@amcharts/amcharts5-geodata": "^5.1.5",
     "@quasar/extras": "^1.16.17",
     "nuxt": "^3.17.2",
     "nuxt-quasar-ui": "^2.1.12",
