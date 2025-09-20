@@ -21,7 +21,7 @@
           <div v-else class="continent-buttons">
             <button v-for="continent in continents" :key="continent.continent_id"
                     @click="selectContinent(continent)"
-                    @mouseenter="highlightContinent(continent.continent_id)"
+                    @mouseenter="highlightContinent(continent.continent_ko)"
                     @mouseleave="highlightContinent(null)"
                     class="continent-btn">
               <span class="continent-btn-text">{{ continent.continent_ko }}</span>
@@ -69,7 +69,7 @@
       <section class="right-panel">
         <div v-if="!selectedLocationDetails" class="map-wrapper">
           <InteractiveMap 
-            :continent-to-focus="selectedContinent?.continent_id"
+            :continent-to-focus="selectedContinent?.continent_ko"
             :country-to-highlight="countryToHighlight"
             :continent-to-highlight="continentToHighlight"
           />
@@ -230,8 +230,8 @@ const selectCity = (city) => {
   fetchLocationDetails(city.location_id);
 };
 
-const highlightContinent = (continentId) => {
-  continentToHighlight.value = continentId;
+const highlightContinent = (continentName) => {
+  continentToHighlight.value = continentName;
 };
 
 const highlightCountry = (countryName) => {

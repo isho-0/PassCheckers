@@ -1,9 +1,6 @@
 <template>
   <div class="map-container">
     <div ref="chartdiv" class="chartdiv"></div>
-    <div v-if="currentMap !== 'world'" @click="goHome" class="back-button">
-      &larr; Back to World
-    </div>
   </div>
 </template>
 
@@ -48,7 +45,18 @@ const continentNameMap = {
 
 const goHome = () => {
   if (chartRef.value) {
+    // 애니메이션 시작 전에 지도 위치를 먼저 중앙으로 설정합니다.
+    chartRef.value.set("panX", 0);
+    chartRef.value.set("panY", 0);
+    // goHome()을 호출하여 줌 레벨만 애니메이션으로 조정합니다.
     chartRef.value.goHome();
+
+    // goHome 호출 시, 'scale' 이벤트가 안정적으로 발생하지 않을 수 있으므로 수동으로 시리즈 가시성을 재설정합니다.
+    if (currentMap.value !== 'world') {
+        currentMap.value = 'world';
+        countrySeriesRef.value.hide();
+        continentSeriesRef.value.show();
+    }
   }
 };
 
@@ -77,9 +85,14 @@ watch(() => props.continentToFocus, (newContinent) => {
                     continentSeriesRef.value.zoomToDataItem(dataItem);
                 }
             }
+            
+            // 대륙 선택 시, 확대 후 국가 시리즈를 강제로 표시
+            continentSeriesRef.value.hide();
+            countrySeriesRef.value.show();
+            currentMap.value = 'countries';
         }
     } else {
-        chartRef.value.goHome();
+        goHome();
     }
 });
 
@@ -128,13 +141,13 @@ onMounted(async () => {
   continentSeriesRef.value = continentSeries;
   continentSeries.mapPolygons.template.setAll({ tooltipText: '{name}', interactive: true, fill: am5.color(0xaaaaaa) });
   continentSeries.mapPolygons.template.states.create('hover', { fill: am5.color(0x9EBC8A), stroke: am5.color(0x73946B), strokeWidth: 2 });
-  continentSeries.mapPolygons.template.states.create("default", { fill: am5.color(0xaaaaaa), stroke: am5.color(0xaaaaaa) });
+  continentSeries.mapPolygons.template.states.create("default", { fill: am5.color(0xaaaaaa), stroke: am5.color(0x888888), strokeWidth: 1 });
 
   let countrySeries = chart.series.push(am5map.MapPolygonSeries.new(r, { geoJSON: am5geodata_worldLow, exclude: ['AQ'], visible: false }));
   countrySeriesRef.value = countrySeries;
   countrySeries.mapPolygons.template.setAll({ tooltipText: '{name}', interactive: true, fill: am5.color(0xcccccc) });
   countrySeries.mapPolygons.template.states.create('hover', { fill: am5.color(0x9EBC8A), stroke: am5.color(0x73946B), strokeWidth: 2 });
-  countrySeries.mapPolygons.template.states.create("default", { fill: am5.color(0xcccccc), stroke: am5.color(0xcccccc) });
+  countrySeries.mapPolygons.template.states.create("default", { fill: am5.color(0xcccccc), stroke: am5.color(0xaaaaaa), strokeWidth: 1 });
 
   countrySeries.mapPolygons.template.events.on('click', (ev) => {
     const countryNameFromMap = ev.target.dataItem.dataContext.name;
@@ -150,7 +163,7 @@ onMounted(async () => {
   chart.chartContainer.get('background').events.on('click', () => goHome());
 
   chart.seriesContainer.events.on('scale', () => {
-    if (chart.zoomLevel() > 1.5) {
+    if (chart.zoomLevel() > 1.2) {
       continentSeries.hide();
       countrySeries.show();
       currentMap.value = 'countries';
