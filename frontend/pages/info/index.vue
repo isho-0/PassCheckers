@@ -283,7 +283,7 @@ onMounted(fetchContinents);
   padding: 1.5rem;
   border: 1px solid #dee2e6;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  height: 682px; /* Match left panel's potential height */
+  height: 682px; 
 }
 .details-view-wrapper { 
   background-color: white;

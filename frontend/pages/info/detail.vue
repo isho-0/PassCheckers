@@ -127,7 +127,7 @@ const activeSection = ref('');
 const observer = ref(null);
 const sectionElements = ref([]);
 
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = 'http://' + window.location.hostname + ':5001/api';
 
 const contentSections = computed(() => {
   return locationDetails.value?.location_content || [];

@@ -123,7 +123,8 @@ watch(() => props.countryToHighlight, (newVal) => {
 
 onMounted(async () => {
   try {
-    const response = await fetch('http://localhost:5001/api/locations/country-map');
+    const API_BASE_URL = 'http://' + window.location.hostname + ':5001';
+    const response = await fetch(`${API_BASE_URL}/api/locations/country-map`);
     if (!response.ok) throw new Error('Country map data fetch failed');
     countryLocationMap.value = await response.json();
   } catch (e) {
