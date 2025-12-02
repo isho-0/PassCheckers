@@ -245,6 +245,59 @@ def init_db():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     """)
 
+    # analysis_results 테이블 생성
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS analysis_results (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id VARCHAR(50) NOT NULL,
+            image_id INT NOT NULL,
+            image_url TEXT,
+            image_width INT,
+            image_height INT,
+            total_items INT NOT NULL,
+            analysis_date DATETIME NOT NULL,
+            destination VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    """)
+
+    # analysis_items 테이블 생성
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS analysis_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            analysis_id INT NOT NULL,
+            item_name_ko VARCHAR(255) NOT NULL,
+            item_name_en VARCHAR(255),
+            confidence DECIMAL(5,4),
+            carry_on_allowed VARCHAR(100),
+            checked_baggage_allowed VARCHAR(100),
+            notes TEXT,
+            notes_EN TEXT,
+            source VARCHAR(50),
+            bbox_x_min DECIMAL(10,8),
+            bbox_y_min DECIMAL(10,8),
+            bbox_x_max DECIMAL(10,8),
+            bbox_y_max DECIMAL(10,8),
+            predicted_weight_value DECIMAL(10,2),
+            predicted_weight_unit VARCHAR(10),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (analysis_id) REFERENCES analysis_results(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    """)
+
+    # 스키마 마이그레이션: analysis_results 테이블에 share_code 컬럼이 없는 경우 추가
+    cursor.execute("""
+        SELECT COUNT(*) as cnt
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = %s
+        AND TABLE_NAME = 'analysis_results'
+        AND COLUMN_NAME = 'share_code'
+    """, (db_name,))
+    if cursor.fetchone()['cnt'] == 0:
+        cursor.execute("ALTER TABLE analysis_results ADD COLUMN share_code VARCHAR(10) UNIQUE AFTER destination")
+        print("[DB MIGRATION] 'share_code' 컬럼이 'analysis_results' 테이블에 추가되었습니다.")
+
     # ===== 커뮤니티 테이블 생성 =====
     
     # posts 테이블 생성
@@ -358,19 +411,6 @@ def init_db():
     if cursor.fetchone()['cnt'] == 0:
         cursor.execute("ALTER TABLE items ADD COLUMN category VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL")
         print("[DB MIGRATION] 'category' column added to 'items' table.")
-
-    # 스키마 마이그레이션: analysis_results 테이블에 share_code 컬럼이 없는 경우 추가
-    cursor.execute("""
-        SELECT COUNT(*) as cnt
-        FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = %s
-        AND TABLE_NAME = 'analysis_results'
-        AND COLUMN_NAME = 'share_code'
-    """, (db_name,))
-    if cursor.fetchone()['cnt'] == 0:
-        cursor.execute("ALTER TABLE analysis_results ADD COLUMN share_code VARCHAR(10) UNIQUE AFTER destination")
-        print("[DB MIGRATION] 'share_code' 컬럼이 'analysis_results' 테이블에 추가되었습니다.")
-
     # share_connections 테이블 생성 (공유 기능용)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS share_connections (
